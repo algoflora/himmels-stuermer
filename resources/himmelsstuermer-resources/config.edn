@@ -1,0 +1,19 @@
+{:api/fn  #profile {:aws  himmelsstuermer.impl.api/request
+                    :test himmelsstuermer.impl.e2e/request}
+
+ :db/conn #profile {:aws  "/mnt/efs/dtlv"
+                    :test nil}
+
+ :bot/default-language-code :en
+
+ :bot/roles {}
+
+ :logging/level :info
+
+ :project/config {}
+
+ :handler/main himmelsstuermer.handler/main
+
+ :handler/payment himmelsstuermer.handler/payment
+
+ :actions/namespace himmelsstuermer.actions}

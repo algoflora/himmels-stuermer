@@ -1,0 +1,23 @@
+dtlv/
+
+# OS
+
+.DS_Store
+
+# Clojure
+
+target/
+
+.clj-kondo/
+.cpcache/
+.lsp/
+.work
+
+# Emacs
+
+*~
+\#*#
+.#*
+
+.emacs.desktop
+.emacs.desktop.lock

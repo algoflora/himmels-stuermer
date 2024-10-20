@@ -1,0 +1,57 @@
+FROM amazonlinux:2023
+
+ENV GRAALVM_VERSION=22.3.1
+ENV TARGET_ARCH=aarch64
+
+# Install necessary packages
+
+RUN dnf install -y \
+    bash \
+    gcc \
+    glibc-devel \
+    gzip \
+    libstdc++-static \
+    tar \
+    zlib-devel
+
+# Install GraalVM
+
+ENV GRAALVM_FILENAME="graalvm-ce-java11-linux-${TARGET_ARCH}-${GRAALVM_VERSION}.tar.gz"
+RUN curl -Lo /graalvm.tar.gz "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/${GRAALVM_FILENAME}"
+RUN mkdir /graalvm
+RUN tar -xzvf /graalvm.tar.gz -C /graalvm --strip-components=1
+ENV JAVA_HOME=/graalvm
+ENV PATH="/graalvm/bin:$PATH"
+RUN gu install native-image
+
+# Install Leiningen
+
+RUN curl -Lo /lein https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+RUN mv /lein /usr/bin/
+RUN chmod +x /usr/bin/lein
+RUN lein
+
+# Copy project
+
+COPY . /app
+
+# Build uberjar
+
+ENV DTLV_COMPILE_NATIVE=true
+ENV USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM=false
+WORKDIR /app
+RUN lein uberjar
+
+# Build native image
+
+RUN native-image \
+    # --features=InitAtBuildTimeFeature \
+    --initialize-at-build-time \
+    --no-fallback \
+    --verbose \
+    -jar target/uberjar/uberjar.jar \
+    -H:Name=lambda \
+    -H:+ReportExceptionStackTraces \
+    -H:Class=himmelsstuermer.core \
+    -H:ConfigurationFileDirectories=META-INF/native-image \
+    -J-Djdk.internal.vm.ci=disable

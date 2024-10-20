@@ -1,0 +1,6 @@
+{:test-entity/user {:db/valueType :db.type/ref
+                    :db/cardinality :db.cardinality/one
+                    :db/unique :db.unique/identity}
+
+ :test-entity/data {:db/valueType :db.type/string
+                    :db/cardinality :db.cardinality/one}}
