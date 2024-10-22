@@ -1,11 +1,12 @@
 (ns himmelsstuermer.impl.texts
   (:require
-    [himmelsstuermer.impl.system.app :as app]
-    [himmelsstuermer.misc :refer [read-resource-dir]]))
+    [himmelsstuermer.impl.state :refer [*state*]]
+    [himmelsstuermer.misc :refer [read-resource-dir]]
+    [missionary.core :as m]))
 
 
 (def ^:private texts
-  (into {} (->> (read-resource-dir "texts")
+  (into {} (->> (m/? (read-resource-dir "texts")) ; TODO: Think about wrapping all this to tasks
                 (map #(into {} [%]))
                 (apply merge))))
 
@@ -20,7 +21,8 @@
 
 (defmethod txti true
   [lang path & args]
-  (let [[path# form] (if (-> path last int?)
+  (let [default-lang (-> *state* :bot :default-language-code)
+        [path# form] (if (-> path last int?)
                        [(->> path (drop-last 1) vec) (last path)]
                        [(vec path) 0])
         lang-map (get-in texts path#)]
@@ -29,8 +31,7 @@
                       {:event ::no-text-map-on-path :path path :lang-map lang-map})))
     (apply format
            (let [forms (or (and (some? lang) ((keyword lang) lang-map))
-                           (and (some? (app/default-language-code))
-                                ((app/default-language-code) lang-map))
+                           (default-lang lang-map)
                            (-> lang-map first val))]
              (if (vector? forms)
                (nth forms (min form (-> forms count dec)))

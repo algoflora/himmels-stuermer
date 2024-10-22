@@ -3,9 +3,6 @@
     [himmelsstuermer.impl.api :as impl]))
 
 
-(def ^:dynamic *user* nil)
-
-
 (defn delete-message
 
   "Delete message with ID `mid` for `user`"

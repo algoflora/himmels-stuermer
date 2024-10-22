@@ -1,9 +1,9 @@
 (ns himmelsstuermer.e2e-test
   (:require
-    [himmelsstuermer.impl.e2e.flow :refer [flows-out defflow]]))
+    [himmelsstuermer.e2e.scenes :refer [situation-run defscene]]))
 
 
-(defflow :users/main-message
+(defscene :users/main-message
   [:ivan/send-text "Ivan"
    :ivan/check-msg "Hi, Ivan!" #{} [[#"Go"] ["Temp"]]
    :mary/send-text "Mary"
@@ -18,7 +18,7 @@
    :mary/check-msg #"stranger" #{} [["Go"] ["Temp"]]])
 
 
-(defflow :users/temp-message
+(defscene :users/temp-message
   [:ivan/check-msg "Hi, stranger!" [["Go"] ["Temp"]]
    :mary/check-msg "Hi, stranger!" [["Go"] ["Temp"]]
    :mary/click-btn "Temp"
@@ -34,7 +34,7 @@
    :mary/check-msg 1 "Hi, stranger!"])
 
 
-(defflow :users/additional-entities
+(defscene :users/additional-entities
   [:ivan/send-text "/start"
    :ivan/check-msg "Hello" [["Save"]]
    :mary/send-text "/start"
@@ -49,14 +49,14 @@
    :mary/check-msg "MARY"])
 
 
-(defflow :users/roles
+(defscene :users/roles
   [:user/send-text "/start"
    :admin/send-text "/start"
    :user/check-msg "Hi"
    :admin/check-msg "Hello, sir"])
 
 
-(defflow :users/error
+(defscene :users/error
   [:user/send-text "/start"
    :user/check-msg "Hello World!" [["Button"]]
    :user/click-btn "Button"
@@ -69,7 +69,7 @@
    :user/check-msg "Hello World!" [["Button"]]])
 
 
-(defflow :users/payment
+(defscene :users/payment
   [:user/send-text "/start"
    :user/check-msg "Give me all your money!" [["Invoice"]]
    :user/click-btn "Invoice"
@@ -79,25 +79,25 @@
    :user/check-and-close-only-temp "Successful payment with payload all-your-money"])
 
 
-(flows-out Core
-           [:users/main-message :users/temp-message])
+(situation-run Core
+               [:users/main-message :users/temp-message])
 
 
-(flows-out DB
-           'himmelsstuermer.e2e-test.handler/store
-           [:users/additional-entities])
+(situation-run DB
+               'himmelsstuermer.e2e-test.handler/store
+               [:users/additional-entities])
 
 
-(flows-out Roles
-           'himmelsstuermer.e2e-test.handler/roled
-           [:users/roles])
+(situation-run Roles
+               'himmelsstuermer.e2e-test.handler/roled
+               [:users/roles])
 
 
-(flows-out Fail
-           'himmelsstuermer.e2e-test.handler/error
-           [:users/error])
+(situation-run Fail
+               'himmelsstuermer.e2e-test.handler/error
+               [:users/error])
 
 
-(flows-out Payment
-           'himmelsstuermer.e2e-test.handler/payment
-           [:users/payment])
+(situation-run Payment
+               'himmelsstuermer.e2e-test.handler/payment
+               [:users/payment])

@@ -1,22 +1,23 @@
-(ns himmelsstuermer.impl.e2e.dummy
+(ns himmelsstuermer.e2e.dummy
   (:require
-    [himmelsstuermer.impl.system.app :as app]
+    [himmelsstuermer.core.init :refer [bot-default-language-code]]
     [himmelsstuermer.misc :refer [remove-nils]]
     [himmelsstuermer.spec.e2e :as spec.e2e]
     [himmelsstuermer.spec.telegram :as spec.tg]
-    [malli.core :as m]))
+    [malli.core :as malli]
+    [missionary.core :as m]))
 
 
 (defonce ^:private dummies (atom {}))
 
 
-(m/=> create [:function
-              [:-> :keyword spec.tg/User]
-              [:=> [:cat :keyword :keyword] spec.tg/User]])
+(malli/=> create [:function
+                  [:-> :keyword spec.tg/User]
+                  [:=> [:cat :keyword :keyword] spec.tg/User]])
 
 
 (defn- create
-  ([key] (create key (app/default-language-code)))
+  ([key] (create key (m/? bot-default-language-code)))
   ([key lang]
    {:id (inc (count @dummies))
     :is_bot false
@@ -25,12 +26,12 @@
     :language_code (name lang)}))
 
 
-(m/=> new [:-> :keyword spec.e2e/Dummy-Entry])
+(malli/=> new [:-> :keyword spec.e2e/Dummy-Entry])
 
 
 (defn new
-  [key]
-  (key (swap! dummies assoc key {:dummy (create key) :messages []})))
+  [k]
+  (k (swap! dummies assoc key {:dummy (create k) :messages []})))
 
 
 (defn clear-all
@@ -38,7 +39,7 @@
   (reset! dummies {}))
 
 
-(m/=> dump-all [:=> [:cat] [:map-of :keyword spec.e2e/Dummy-Entry]])
+(malli/=> dump-all [:=> [:cat] [:map-of :keyword spec.e2e/Dummy-Entry]])
 
 
 (defn dump-all
@@ -46,7 +47,7 @@
   @dummies)
 
 
-(m/=> restore [:-> [:maybe [:map-of :keyword spec.e2e/Dummy-Entry]] :any])
+(malli/=> restore [:-> [:maybe [:map-of :keyword spec.e2e/Dummy-Entry]] :any])
 
 
 (defn restore
@@ -54,7 +55,7 @@
   (reset! dummies (or data {})))
 
 
-(m/=> get-by-chat-id [:-> :int spec.e2e/Dummy-Entry])
+(malli/=> get-by-chat-id [:-> :int spec.e2e/Dummy-Entry])
 
 
 (defn- get-by-chat-id
@@ -64,7 +65,7 @@
        first))
 
 
-(m/=> exists? [:-> :keyword :boolean])
+(malli/=> exists? [:-> :keyword :boolean])
 
 
 (defn exists?
@@ -72,17 +73,17 @@
   (contains? @dummies key))
 
 
-(m/=> get-by-key [:-> :keyword spec.e2e/Dummy-Entry])
+(malli/=> get-by-key [:-> :keyword spec.e2e/Dummy-Entry])
 
 
 (defn get-by-key
-  [key]
-  (key @dummies))
+  [k]
+  (k @dummies))
 
 
-(m/=> get-last-messages [:=>
-                         [:cat spec.tg/User :int [:or :boolean :nil]]
-                         [:vector spec.tg/Message]])
+(malli/=> get-last-messages [:=>
+                             [:cat spec.tg/User :int [:or :boolean :nil]]
+                             [:vector spec.tg/Message]])
 
 
 (defn get-last-messages
@@ -96,7 +97,7 @@
        (into [])))
 
 
-(m/=> get-first-message [:-> spec.tg/User spec.tg/Message])
+(malli/=> get-first-message [:-> spec.tg/User spec.tg/Message])
 
 
 (defn get-first-message
@@ -107,19 +108,19 @@
 (defn- prepare-request
   [req]
   (cond ; TODO: Think about it...
-    (m/validate spec.tg/SendMessageRequest req) (identity req)
-    (m/validate spec.tg/Message req)            (identity req)
-    (m/validate spec.tg/SendInvoiceRequest req) (let [root-keys [:chat_id :reply_markup]]
-                                                  (assoc (select-keys req root-keys)
-                                                         :invoice
-                                                         (apply dissoc req root-keys)))))
+    (malli/validate spec.tg/SendMessageRequest req) (identity req)
+    (malli/validate spec.tg/Message req)            (identity req)
+    (malli/validate spec.tg/SendInvoiceRequest req) (let [root-keys [:chat_id :reply_markup]]
+                                                      (assoc (select-keys req root-keys)
+                                                             :invoice
+                                                             (apply dissoc req root-keys)))))
 
 
-(m/=> add-message [:=> [:cat [:or
-                              spec.tg/SendMessageRequest
-                              spec.tg/SendInvoiceRequest
-                              spec.tg/Message]]
-                   spec.tg/Message])
+(malli/=> add-message [:=> [:cat [:or
+                                  spec.tg/SendMessageRequest
+                                  spec.tg/SendInvoiceRequest
+                                  spec.tg/Message]]
+                       spec.tg/Message])
 
 
 (defn add-message
@@ -146,7 +147,7 @@
     (first (get-last-messages dummy 1 nil))))
 
 
-(m/=> find-message-index [:=> [:cat [:vector spec.tg/Message] :int] :int])
+(malli/=> find-message-index [:=> [:cat [:vector spec.tg/Message] :int] :int])
 
 
 (defn- find-message-index
@@ -162,7 +163,7 @@
       :else (first idxs))))
 
 
-(m/=> update-message-text [:-> spec.tg/EditMessageTextRequest spec.tg/Message])
+(malli/=> update-message-text [:-> spec.tg/EditMessageTextRequest spec.tg/Message])
 
 
 (defn update-message-text
@@ -184,16 +185,16 @@
     (get-in dummies# [key :messages msg-idx])))
 
 
-(m/=> delete-message [:=> [:cat :int :int] :boolean])
+(malli/=> delete-message [:=> [:cat :int :int] :boolean])
 
 
 (defn delete-message
   [chat-id message-id]
   (let [dummy (:dummy (get-by-chat-id chat-id))
-        key (-> dummy :username keyword)]
+        k     (-> dummy :username keyword)]
     (swap! dummies (fn [dms]
                      (update-in dms [key :messages]
                                 (fn [msgs]
                                   (into [] (filter #(not= message-id (:message_id %)) msgs))))))
     ;; TODO: Maybe just `true` later
-    (empty? (filter #(= message-id (:message_id %)) (-> @dummies key :messages)))))
+    (empty? (filter #(= message-id (:message_id %)) (-> @dummies k :messages)))))

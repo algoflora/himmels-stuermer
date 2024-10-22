@@ -4,41 +4,23 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [datalevin.core :as d]
-    [himmelsstuermer.api]
+    [himmelsstuermer.api.db]
+    [himmelsstuermer.api.vars]
+    [himmelsstuermer.core.logging :refer [reset-nano-timer!]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
-    [himmelsstuermer.db]
     [himmelsstuermer.impl.api :as api]
-    [himmelsstuermer.impl.core :as hs]
     [himmelsstuermer.impl.db]
+    [himmelsstuermer.impl.state]
     [himmelsstuermer.spec :as spec]
-    ;; [himmelsstuermer.spec.action :as spec.act]
-    [himmelsstuermer.spec.aws :as spec.aws]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
-    [me.raynes.fs :as fs]
     [missionary.core :as m]
     [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
 
 
-;; (malli/=> handle-action [:-> spec.act/ActionRequest :any])
-
-
-;; (defn- handle-action
-;;   [{:keys [action] {:keys [method arguments]} :action}]
-;;   (if-let [action-fn (resolve (symbol (str (app/handler-actions-namespace)) method))]
-;;     (log/info ::action-success
-;;               "Action '%s' completed successfully" type
-;;               {:action action
-;;                :ok true
-;;                :response (action-fn arguments)})
-;;     (throw (ex-info "Wrong action type!"
-;;                     {:event ::wrong-action-error
-;;                      :action-type type}))))
-
-
-(defmulti handle-update- (fn [type _] type))
+(defmulti ^:private handle-update- (fn [a & _] a))
 
 
 (defmethod handle-update- :message
@@ -99,7 +81,7 @@
           (s/modify-state state #(update % :tasks conj task)))))
 
 
-(malli/=> handle [:=> [:cat spec/State spec.aws/Record] spec/MissionaryTask])
+(malli/=> handle [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
 (defn handle
@@ -115,9 +97,13 @@
                         (m/? (handle-action (s/modify-state state' #(assoc % :action (:action body))))))
               tx-data (atom (:transaction state''))]
           (tt/event! ::executing-business-logic)
-          (binding [himmelsstuermer.db/*db*      (:database state'')
-                    himmelsstuermer.api/*user*   (:user state'')
-                    himmelsstuermer.impl.db/*tx* tx-data]
+          (binding [himmelsstuermer.api.db/*db*        (:database state'')
+                    himmelsstuermer.api.vars/*user*    (:user state'')
+                    himmelsstuermer.api.vars/*msg*     (some-> state'' :callback_query :message :message_id)
+                    himmelsstuermer.api.vars/*config*  (some-> state'' :project :config)
+                    himmelsstuermer.impl.db/*tx*       tx-data
+                    himmelsstuermer.impl.state/*state* state'']
+            (tt/event! ::running-tasks)
             (m/? (apply m/join (constantly nil) (:tasks state''))))
           ;; TODO: Research situation when message sent, button clicked but transaction still not complete
           (tt/event! ::transact-data {:tx-data @tx-data
@@ -136,7 +122,7 @@
 
 
 (defn- throwable->error-body
-  [t]
+  [^Throwable t]
   {:errorMessage (.getMessage t)
    :errorType    (-> t .getClass .getName)
    :stackTrace   (mapv str (.getStackTrace t))})
@@ -160,7 +146,8 @@
                         (m/reduce conj
                                   (m/ap
                                     (let [record (m/?> (m/seed (:Records (json/decode body keyword))))]
-                                      (m/? (hs/handle state record))))))
+                                      (reset-nano-timer!)
+                                      (m/? (handle state record))))))
                       (tt/event! ::invocation-response-ok {:invocation-id id})
                       (http/post (str runtime-api-url "invocation/" id "/response")
                                  {:body "OK"})
@@ -173,33 +160,33 @@
 
 
 (defn -main
-  [& args]
+  [& _]
   (m/? (m/reduce conj app)))
 
 
-(comment
-  (require '[datalevin.core :as d]
-           '[me.raynes.fs :as fs])
+;; (comment
+;;   (require '[datalevin.core :as d]
+;;            '[me.raynes.fs :as fs])
 
-  (let [dir (str (fs/temp-dir ""))
-        cn  (d/get-conn dir)]
+;;   (let [dir (str (fs/temp-dir ""))
+;;         cn  (d/get-conn dir)]
 
-    (d/transact! cn [[:db/add -1 :a/id 1]
-                     [:db/add -2 :a/id 2]
-                     [:db/add -3 :a/id 3]])
+;;     (d/transact! cn [[:db/add -1 :a/id 1]
+;;                      [:db/add -2 :a/id 2]
+;;                      [:db/add -3 :a/id 3]])
 
-    (d/q '[:find ?a
-           :in $ ?ids
-           :where
-           [?a :a/id ?id]
-           (not-join [?id]
-                     [(contains? ?ids ?id)])] (d/db cn) #{1  3}))
+;;     (d/q '[:find ?a
+;;            :in $ ?ids
+;;            :where
+;;            [?a :a/id ?id]
+;;            (not-join [?id]
+;;                      [(contains? ?ids ?id)])] (d/db cn) #{1  3}))
 
 
+;;   (require '[missionary.core :as m])
 
-  (require '[missionary.core :as m])
+;;   (def fl (m/seed [1 2 3 4 5]))
 
-  (def t1 (m/sp (println "PLUS")  (+ 1 1)))
-  (def t2 (m/sp (println "MINUS") (- 1 1)))
+;;   (m/? (m/reduce conj (m/zip inc fl)))
 
-  (m/? (apply m/join vector [t1 t2])))
+;;   )

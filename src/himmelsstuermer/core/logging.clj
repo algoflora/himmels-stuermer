@@ -6,10 +6,16 @@
     [taoensso.telemere :as tt]))
 
 
+(defonce ^:private nano-timer nil)
+
+
+(defn reset-nano-timer!
+  []
+  (reset! nano-timer (System/nanoTime)))
+
+
 (gen/add-encoder Object
-                 (fn [obj json-generator]
-                   ;; Custom logic for serializing unknown objects.
-                   ;; As an example, we'll just serialize the object as a string.
+                 (fn [obj ^com.fasterxml.jackson.core.JsonGenerator json-generator]
                    (.writeString json-generator (str obj))))
 
 
@@ -25,6 +31,7 @@
 (defn init-logging!
   [project-info profile]
   (tt/set-ctx! {:project project-info :profile profile})
+  (tt/set-middleware! #(assoc % :millis-passed (-> (System/nanoTime) (- @nano-timer) (* 0.000001))))
   (tt/add-handler! :console-json console-json-handler)
   (fs/delete "./logs.edn")
   (tt/add-handler! :file-edn-disposable file-edn-disposable-handler))

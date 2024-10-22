@@ -1,16 +1,16 @@
 (ns himmelsstuermer.e2e
   (:require
-    [himmelsstuermer.impl.e2e.flow :as impl]))
+    [himmelsstuermer.e2e.scenes :as impl]))
 
 
-(defmacro defflow
+(defmacro defscene
   {:style/indent [1]}
   [& args]
-  `(impl/defflow ~@args))
+  `(impl/defscene ~@args))
 
 
-(defmacro flows-out
+(defmacro situation-run
   {:style/indent [1]
    :clj-kondo/lint-as 'clojure.core/def}
   [& args]
-  `(impl/flows-out ~@args))
+  `(impl/situation-run ~@args))

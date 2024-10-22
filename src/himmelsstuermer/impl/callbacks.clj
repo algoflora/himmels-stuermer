@@ -1,7 +1,7 @@
 (ns himmelsstuermer.impl.callbacks
   (:require
     [datalevin.core :as d]
-    [himmelsstuermer.db :as db]
+    [himmelsstuermer.api.db :as db]
     [himmelsstuermer.spec :as spec]
     [malli.core :as malli]
     [missionary.core :as m]
@@ -10,10 +10,10 @@
 
 (malli/=> set-callback
           [:function
-           [:=> [:cat spec.mdl/User :symbol [:maybe :map]] :uuid]
-           [:=> [:cat spec.mdl/User :symbol [:maybe :map] :boolean] :uuid]
+           [:=> [:cat spec/User :symbol [:maybe :map]] :uuid]
+           [:=> [:cat spec/User :symbol [:maybe :map] :boolean] :uuid]
            [:=> [:cat
-                 spec.mdl/User
+                 spec/User
                  :symbol
                  [:maybe :map]
                  :boolean
@@ -27,17 +27,17 @@
   ([user f args is-service]
    (set-callback user f args is-service (java.util.UUID/randomUUID)))
   ([user f args is-service uuid]
-   (let [args (or args {})
-         tx-data [{:callback/uuid uuid
-                   :callback/function f
-                   :callback/arguments args
-                   :callback/service? is-service
-                   :callback/user [:user/uuid (:user/uuid user)]}]]
-     (db/transact tx-data)
-     (tt/event! ::callback-create {:user user
-                                   :function f
-                                   :arguments args})
-     uuid)))
+   (m/sp (let [args (or args {})
+               tx-data [{:callback/uuid uuid
+                         :callback/function f
+                         :callback/arguments args
+                         :callback/service? is-service
+                         :callback/user [:user/uuid (:user/uuid user)]}]]
+           (db/transact tx-data)
+           (tt/event! ::callback-create {:user user
+                                         :function f
+                                         :arguments args})
+           uuid))))
 
 
 (malli/=> delete [:=> [:cat spec/User :int] spec/MissionaryTask])

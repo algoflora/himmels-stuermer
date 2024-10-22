@@ -1,23 +1,23 @@
- (ns himmelsstuermer.impl.e2e.flow
-   (:require
-     [clojure.string :as str]
-     [clojure.test :refer [is testing]]
-     [himmelsstuermer.dynamic :refer [*dtlv*]]
-     [himmelsstuermer.impl.e2e.client :as cl]
-     [himmelsstuermer.impl.e2e.dummy :as dum]
-     [himmelsstuermer.impl.errors :refer [handle-error]]
-     [himmelsstuermer.impl.system :as sys]
-     [himmelsstuermer.impl.system.app :as app]
-     [himmelsstuermer.logging]
-     [himmelsstuermer.spec.blueprint :as spec.bp]
-     [himmelsstuermer.spec.commons :refer [Regexp]]
-     [himmelsstuermer.spec.telegram :as spec.tg]
-     [malli.core :as m]
-     [taoensso.timbre :as log]
-     [tick.core :as t]))
+(ns himmelsstuermer.e2e.scenes
+  {:clj-kondo/config '{:ignore [:unused-private-var]}}
+  (:require
+    [clojure.pprint :refer [pprint]]
+    [clojure.string :as str]
+    [clojure.test :refer [is testing]]
+    [himmelsstuermer.core.init :refer [handler-main]]
+    [himmelsstuermer.e2e.client :as cl]
+    [himmelsstuermer.e2e.dummy :as dum]
+    [himmelsstuermer.impl.errors :refer [handle-error]]
+    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.blueprint :as spec.bp]
+    [himmelsstuermer.spec.telegram :as spec.tg]
+    [malli.core :as malli]
+    [missionary.core :as m]
+    [taoensso.telemere :as tt]
+    [tick.core :as t]))
 
 
-(m/=> str?->re [:-> [:or :string Regexp] Regexp])
+(malli/=> str?->re [:-> [:or :string spec/Regexp] spec/Regexp])
 
 
 (defn- str?->re
@@ -29,12 +29,11 @@
   [dummy]
   (let [key   (-> dummy :username keyword)
         dummy (dum/get-by-key key)]
-    (log/info ::dumping-dummy
-              "Dumping dummy %s\n%s" key (with-out-str (clojure.pprint/pprint dummy))
-              {:dummy dummy})))
+    (println (format "Dumping dummy %s\n%s" key (with-out-str (pprint dummy))))
+    (tt/event! ::dumping-dummy {:dummy dummy})))
 
 
-(m/=> get-message [:=> [:cat spec.tg/User [:maybe [:int {:min 1}]]] spec.tg/Message])
+(malli/=> get-message [:=> [:cat spec.tg/User [:maybe [:int {:min 1}]]] spec.tg/Message])
 
 
 (defn- get-message
@@ -46,29 +45,27 @@
     (dum/get-first-message dummy)))
 
 
-(m/=> send-text [:=> [:cat spec.tg/User spec.bp/SendTextBlueprintEntryArgs] :any])
+(malli/=> send-text [:=> [:cat spec.tg/User spec.bp/SendTextBlueprintEntryArgs] :any])
 
 
 (defn- send-text
   ([dummy text] (send-text dummy text []))
   ([dummy text entities]
-   (log/debug ::dummy-send-text
-              "Dummy %s sendindg message: %s" (-> dummy :username keyword) text
+   (tt/event! ::dummy-send-text
               {:dummy dummy
                :text text})
-   (log/debug ::dummy-sent-text {:response (cl/send-text dummy (str text) entities)})))
+   (cl/send-text dummy (str text) entities)))
 
 
-(m/=> click-btn [:=> [:cat spec.tg/User spec.bp/ClickBtnBlueprintEntryArgs] :any])
+(malli/=> click-btn [:=> [:cat spec.tg/User spec.bp/ClickBtnBlueprintEntryArgs] :any])
 
 
 (defn- click-btn
+  {:clj-kondo/ignore [:unused-private-var]}
   ([dummy btn-re] (click-btn dummy nil btn-re))
   ([dummy num? btn-re]
    (let [msg (get-message dummy num?)]
-     (log/debug ::dummy-click-btn
-                "Dummy %s clicking button '%s' in message '%s'"
-                (-> dummy :username keyword) (str btn-re) (or (:text msg) (:caption msg))
+     (tt/event! ::dummy-click-btn
                 {:dummy dummy
                  :button btn-re
                  :message msg})
@@ -79,27 +76,22 @@
 
 
 (defmethod -check-message java.lang.String
-  [{:keys [text caption] :as msg} exp]
-  (testing "text or caption"
-    (cond
-      (and (some? text) (nil? caption)) (is (= exp text))
-      (and (some? caption) (nil? text)) (is (= exp caption))
-      :else (throw (ex-info ":text and :caption in same Message!"
-                            {:event ::text-and-caption-both-error
-                             :message msg})))))
+  [{:keys [text caption]} exp]
+  (cond
+    (some? text)    (testing ">>> Checking text...\n\n"    (is (= exp text)))
+    (some? caption) (testing ">>> Checking caption...\n\n" (is (= exp caption)))))
 
 
 (defmethod -check-message java.util.regex.Pattern
-  [{:keys [text caption] :as msg} exp]
-  (testing (str "text or caption regex of " msg)
-    (is (or (and (some? text) (some? (re-find exp text)))
-            (and (some? caption) (some? (re-find exp caption)))))))
+  [{:keys [text caption]} exp]
+  (cond (some? text)    (testing ">>> Checking text...\n\n"    (is (some? (re-find exp text))))
+        (some? caption) (testing ">>> Checking caption...\n\n" (is (some? (re-find exp caption))))))
 
 
 (defmethod -check-message clojure.lang.PersistentVector
   [msg exp]
   (let [kbd (-> msg :reply_markup :inline_keyboard)]
-    (testing (str "buttons: " exp "in " kbd "\n")
+    (testing ">>> Checking buttons...\n"
       (is (= (count exp) (count kbd)) "Different rows count!")
       (doseq [[row-idx row] (map-indexed vector exp)]
         (is (= (count (get exp row-idx)) (count row))
@@ -108,30 +100,32 @@
           (let [re       (str?->re data)
                 btn      (get-in kbd [row-idx col-idx])
                 re-found (re-find re (:text btn))]
-            (testing (format "%s =|= %s" re (:text btn))
+            (testing (format ">>> %s : %s\n\n" re (:text btn))
               (is (some? re-found)))))))))
 
 
 (defmethod -check-message clojure.lang.PersistentHashSet
-  [msg exp]
-  (testing (format "text or caption entities %s %s" (:entities msg) exp)
-    (is (or (= exp (set (:entities msg)))
-            (= exp (set (:caption_entities msg)))))))
+  [{:keys [entities caption_entities]} exp]
+  (cond (some? entities)         (testing ">>> Checking text entities...\n\n"
+                                   (is (= exp (set entities))))
+        (some? caption_entities) (testing ">>> Checking caption entities...\n\n"
+                                   (is (= exp (set caption_entities))))
+        :else (is false "No entities or caption_entities!")))
 
 
-(m/=> check-msg [:=> [:cat spec.tg/User spec.bp/CheckMessageBlueprintEntryArgs] :nil])
+(malli/=> check-msg [:=> [:cat spec.tg/User spec.bp/CheckMessageBlueprintEntryArgs] :nil])
 
 
 (defn- check-msg
   [dummy & args]
   (let [[num args] (if (-> args first pos-int?) [(first args) (rest args)] [nil args])
         msg (get-message dummy num)]
-    (testing "check-message"
+    (testing "> Function:\tcheck-msg\n"
       (doseq [arg args]
         (-check-message msg arg)))))
 
 
-(m/=> check-invoice [:=> [:cat spec.tg/User [:? :int] spec.bp/CheckInvoiceBlueprintEntryArgs] :nil])
+(malli/=> check-invoice [:=> [:cat spec.tg/User [:? :int] spec.bp/CheckInvoiceBlueprintEntryArgs] :nil])
 
 
 (defn- check-invoice
@@ -140,13 +134,14 @@
   ([dummy title description currency prices buttons]
    (check-invoice dummy 1 title description currency prices buttons))
   ([dummy num title description currency prices buttons]
-   (let [{:keys [invoice] :as msg} (get-message dummy num)]
-     (is (some? invoice))
-     (is (= title (:title invoice)))
-     (is (= description (:description invoice)))
-     (is (= currency (:currency invoice)))
-     (is (= prices (:prices invoice)))
-     (-check-message msg buttons))))
+   (testing "> Function:\tcheck-invoice\n"
+     (let [{:keys [invoice] :as msg} (get-message dummy num)]
+       (testing ">>> Checking invoice exists...\n\n"      (is (some? invoice)))
+       (testing ">>> Checking invoice title...\n\n"       (is (= title (:title invoice))))
+       (testing ">>> Checking invoice description...\n\n" (is (= description (:description invoice))))
+       (testing ">>> Checking invoice currency...\n\n"    (is (= currency (:currency invoice))))
+       (testing ">>> Checking invoice prices...\n\n"      (is (= prices (:prices invoice))))
+       (-check-message msg buttons)))))
 
 
 (defn- pay-invoice
@@ -182,7 +177,7 @@
   [_ f k1 k2]
   (let [v1 (k1 @vars)
         v2 (k2 @vars)]
-    (testing (format "%s of %s (%s) and %s (%s)" f k1 v1 k2 v2)
+    (testing (format ">>> Checking variables: %s of %s (%s) and %s (%s)...\n\n" f k1 v1 k2 v2)
       (is (f v1 v2)))))
 
 
@@ -206,14 +201,14 @@
                    (dum/exists? key) (-> key dum/get-by-key :dummy)
 
                    (= (-> key name (str/split #"\.") first)
-                      (-> (app/handler-main) namespace (str/split #"\.") first))
+                      (-> (m/? handler-main) namespace (str/split #"\.") first))
                    nil
 
                    :else (-> key dum/new :dummy))
            symb  (-> blueprint first name)
            func  (resolve (symbol "himmelsstuermer.impl.e2e.flow" symb))
            args  (->> blueprint rest (take-while #(not (qualified-keyword? %))))]
-       (testing (format "%4d | <%s/%s %s>\n" line key symb (str/join " " args))
+       (testing (format "> Line:\t%4d\n> Dummy:\t%s\n> Action:\t%s\n> Arguments:\t%s\n" line key symb (str/join " " args))
          (apply func dummy args))
        (apply-blueprint (drop (+ 1 (count args)) blueprint) (inc line))))))
 
@@ -255,8 +250,8 @@
 
 (defn- call!
   [_ f & args]
-  (binding [*dtlv* (app/db-conn)]
-    (apply (requiring-resolve f) args)))
+  ;; TODO: Find out the way for database connection in such call
+  (apply (requiring-resolve f) args))
 
 
 (defn- action!
@@ -290,36 +285,34 @@
   (t/reset! *clock* (t/clock)))
 
 
-(defn flow
+(defn situation
   [blueprints]
   (try
-    (sys/startup!)
     (doseq [[k bp] blueprints]
-      (testing (str k)
+      (testing (str "Scene:\t" k "\n")
         (t/with-clock *clock*
                       (apply-blueprint bp))))
     (catch Exception ex
       (handle-error ex)
       (throw ex))
     (finally
-      (dum/clear-all)
-      (sys/shutdown!))))
+      (dum/clear-all))))
 
 
-(defonce flows (atom {}))
+(defonce scenes (atom {}))
 
 
-(defn get-flow
-  [key]
-  (if-let [flow (key @flows)]
+(defn get-scene
+  [k]
+  (if-let [flow (k @scenes)]
     flow
-    (throw (ex-info (format "Flow with key `%s` not found!" key)
+    (throw (ex-info (format "Flow with key `%s` not found!" k)
                     {:event :flow-not-found-error
-                     :key key
-                     :available-keys (keys @flows)}))))
+                     :key k
+                     :available-keys (keys @scenes)}))))
 
 
-(defmacro defflow
+(defmacro defscene
   [key blueprint]
   {:style/indent [1]}
   (let [key (if (qualified-keyword? key) key
@@ -331,10 +324,10 @@
                                (rest $)
                                (str/join "." $))
                          (name key)))]
-    `(swap! flows assoc ~key ~blueprint)))
+    `(swap! scenes assoc ~key ~blueprint)))
 
 
-(defmacro flows-out
+(defmacro situation-run
   {:style/indent [1]
    :clj-kondo/lint-as 'clojure.core/def}
   [name & args]
@@ -343,10 +336,10 @@
        (clojure.test/deftest ~name
          (let [~'a-clock (t/atom)
                ~'blueprints (mapv #(cond
-                                     (keyword? %) [% (get-flow %)]
+                                     (keyword? %) [% (get-scene %)]
                                      (vector?  %) [:inline %])
                                   ~arg)]
-           (with-redefs [himmelsstuermer.impl.system.app/handler-main
-                         (if (some? ~h) (fn [] ~h) himmelsstuermer.impl.system.app/handler-main)]
+           (with-redefs [himmelsstuermer.core.init/handler-main
+                         ~(if (some? h) `(fn [] (m/sp ~h)) `himmelsstuermer.core.init/handler-main)]
              (binding [*clock* ~'a-clock]
-               (flow ~'blueprints))))))))
+               (situation ~'blueprints))))))))

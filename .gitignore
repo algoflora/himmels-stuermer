@@ -8,7 +8,8 @@ dtlv/
 
 target/
 
-.clj-kondo/
+.clj-kondo/*
+!.clj-kondo/config.edn
 .cpcache/
 .lsp/
 .work

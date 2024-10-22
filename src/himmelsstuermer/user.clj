@@ -1,14 +1,14 @@
 (ns himmelsstuermer.user
   (:require
-    [himmelsstuermer.dynamic :refer [*user*]]
+    [himmelsstuermer.api.vars :refer [*user*]]
     [himmelsstuermer.impl.callbacks :as clb]
-    [himmelsstuermer.impl.system.app :as app]))
+    [himmelsstuermer.impl.state :refer [*state*]]))
 
 
 (defn has-role?
   ([role] (has-role? role *user*))
   ([role user]
-   (boolean (some #{(:user/id user) (:user/username user)} (set (role @app/bot-roles))))))
+   (boolean (some #{(:user/id user) (:user/username user)} (set (role (-> *state* :bot :roles)))))))
 
 
 (defmacro with-role
@@ -18,8 +18,8 @@
   `(do
      (require '[himmelsstuermer.api]
               '[himmelsstuermer.button]
-              '[himmelsstuermer.dynamic])
-     (if (himmelsstuermer.user/has-role? ~role ~'himmelsstuermer.dynamic/*user*)
+              '[himmelsstuermer.api.vars])
+     (if (himmelsstuermer.user/has-role? ~role ~'himmelsstuermer.api.vars/*user*)
        (do ~@body)
        (himmelsstuermer.api/send-message ~'*user* "⛔ Forbidden! ⛔" [[(himmelsstuermer.button/home-btn "🏠 To Main Menu")]]))))
 

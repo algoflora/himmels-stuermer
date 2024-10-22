@@ -1,11 +1,37 @@
 (ns himmelsstuermer.spec
   (:require
+    [datalevin.core :as d]
     [datalevin.db]
+    [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.spec.telegram :as spec.tg]))
 
 
 (def MissionaryTask
   [:fn #(instance? clojure.lang.RestFn %)]) ; TODO: Wait for Missionary update about meta or smth...
+
+
+(def Regexp
+  [:fn #(instance? java.util.regex.Pattern %)])
+
+
+(def Buttons
+  [:vector
+   [:maybe [:vector
+            [:maybe [:fn #(instance? b/KeyboardButton %)]]]]])
+
+
+(def Record
+  [:map
+   [:attributes
+    [:map-of :keyword :string]]
+   [:awsRegion :string]
+   [:body :string]
+   [:eventSource :string]
+   [:eventSourceARN :string]
+   [:md5OfBody :string]
+   [:messageAttributes [:map]]
+   [:messageId :string]
+   [:receiptHandle :string]])
 
 
 (def Action
@@ -47,7 +73,7 @@
   [:map {:closed true}
    [:profile :keyword]
    [:system [:map {:closed true}
-             [:db-conn [:fn #(instance? clojure.lang.Atom %)]]
+             [:db-conn [:fn #(d/conn? %)]]
              [:api-fn fn?]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]

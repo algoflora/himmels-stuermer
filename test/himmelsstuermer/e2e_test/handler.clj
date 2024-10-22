@@ -3,8 +3,9 @@
     [clojure.string :as str]
     [datalevin.core :as d]
     [himmelsstuermer.api :as api]
-    [himmelsstuermer.button :as b]
-    [himmelsstuermer.dynamic :refer [*user* *dtlv* dtlv]]
+    [himmelsstuermer.api.buttons :as b]
+    [himmelsstuermer.api.db :refer [*db* transact]]
+    [himmelsstuermer.api.vars :refer [*user*]]
     [himmelsstuermer.user :as u]
     [taoensso.timbre :as log]))
 
@@ -37,8 +38,8 @@
 
 (defn save
   [_]
-  (d/transact! *dtlv* [{:test-entity/user [:user/id (:user/id *user*)]
-                        :test-entity/data (str/upper-case (:user/first-name *user*))}])
+  (transact [{:test-entity/user [:user/id (:user/id *user*)]
+              :test-entity/data (str/upper-case (:user/first-name *user*))}])
   (api/send-message *user* "Name saved" [[(b/text-btn "Reveal" 'himmelsstuermer.e2e-test.handler/reveal)]]))
 
 
@@ -48,7 +49,7 @@
                             :in $ ?uid
                             :where
                             [?e :test-entity/user [:user/id ?uid]]
-                            [?e :test-entity/data ?n]] (dtlv) (:user/id *user*)))]
+                            [?e :test-entity/data ?n]] *db* (:user/id *user*)))]
     (log/debug ::reveal-2 {})
     (api/send-message *user* name [])
     (log/debug ::reveal-3 {})))

@@ -49,6 +49,24 @@
    [:pay {:optional true} [:= true]]])
 
 
+(def ReplyMarkup
+  [:map {:closed true}
+   [:inline_keyboard [:vector
+                      [:vector
+                       Button]]]])
+
+
+(def BaseMessage
+  [:map
+   {:closed true}
+   [:message_id {:optional true} :int]
+   [:from  User]
+   [:chat Chat]
+   [:date :int]
+   [:edit_date {:optional true} :int]
+   [:reply_markup {:optional true} ReplyMarkup]])
+
+
 (def TextMessage
   [:map {:closed true}
    [:message_id {:optional true} :int]
@@ -58,10 +76,7 @@
    [:edit_date {:optional true} :int]
    [:text :string]
    [:entities {:optional true} [:maybe [:vector MessageEntity]]]
-   [:reply_markup {:optional true} [:map {:closed true}
-                                    [:inline_keyboard [:vector
-                                                       [:vector
-                                                        Button]]]]]])
+   [:reply_markup {:optional true} ReplyMarkup]])
 
 
 (def Invoice
@@ -85,10 +100,7 @@
    [:date :int]
    [:edit_date {:optional true} :int]
    [:invoice Invoice]
-   [:reply_markup {:optional true} [:map {:closed true}
-                                    [:inline_keyboard [:vector
-                                                       [:vector
-                                                        Button]]]]]])
+   [:reply_markup {:optional true} ReplyMarkup]])
 
 
 (def SuccessfulPayment
@@ -108,10 +120,7 @@
    [:date :int]
    [:edit_date {:optional true} :int]
    [:successful_payment SuccessfulPayment]
-   [:reply_markup {:optional true} [:map {:closed true}
-                                    [:inline_keyboard [:vector
-                                                       [:vector
-                                                        Button]]]]]])
+   [:reply_markup {:optional true} ReplyMarkup]])
 
 
 (def Message
@@ -123,8 +132,15 @@
 
 (def MessageUpdate
   [:map {:closed true}
-   [:update_id :int]
+   [:update_id {:optional true} :int]
    [:message Message]])
+
+
+(def BaseCallbackQuery
+  [:map
+   {:closed true}
+   [:id :string]
+   [:from User]])
 
 
 (def CallbackQuery
@@ -143,7 +159,7 @@
 
 (def CallbackQueryUpdate
   [:map {:closed true}
-   [:update_id :int]
+   [:update_id {:optional true} :int]
    [:callbacK_query CallbackQuery]])
 
 
@@ -159,7 +175,7 @@
 
 (def PreCheckoutQueryUpdate
   [:map {:closed true}
-   [:update_id :int]
+   [:update_id {:optional true} :int]
    [:pre_checkout_query PreCheckoutQuery]])
 
 
@@ -168,3 +184,55 @@
    MessageUpdate
    CallbackQueryUpdate
    PreCheckoutQueryUpdate])
+
+
+(def SendMessageRequest
+  [:map {:closed true}
+   [:chat_id :int]
+   [:text :string]
+   [:entities [:maybe [:vector MessageEntity]]]
+   [:reply_markup {:optional true} ReplyMarkup]])
+
+
+(def EditMessageTextRequest
+  [:map {:closed true}
+   [:chat_id :int]
+   [:message_id :int]
+   [:text :string]
+   [:entities [:maybe [:vector MessageEntity]]]
+   [:reply_markup {:optional true} ReplyMarkup]])
+
+
+(def DeleteMessageRequest
+  [:map {:closed true}
+   [:chat_id :int]
+   [:message_id :int]])
+
+
+(def SendInvoiceRequest
+  [:map {:closed true}
+   [:title [:string {:min 1 :max 32}]]
+   [:description [:string {:min 1 :max 255}]]
+   [:payload [:string {:min 1 :max 128}]]
+   [:provider_token {:optional true} :string]
+   [:currency [:string {:min 3 :max 3}]]
+   [:prices [:vector [:map {:closed true}
+                      [:label :string]
+                      [:amount :int]]]]
+   [:reply_markup {:optional true} ReplyMarkup]])
+
+
+(def AnswerPrecheckoutQueryRequest
+  [:map {:closed true}
+   [:pre_checkout_query_id :string]
+   [:ok :boolean]
+   [:error_message {:optional true} :string]])
+
+
+(def Request
+  [:or
+   SendMessageRequest
+   EditMessageTextRequest
+   DeleteMessageRequest
+   SendInvoiceRequest
+   AnswerPrecheckoutQueryRequest])

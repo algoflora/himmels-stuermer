@@ -16,6 +16,10 @@
                  [resauce "0.2.0"]
                  [tick/tick "1.0"]]
 
+  :plugins [[jonase/eastwood "1.4.3"]]
+
+  :clj-kondo {:config "./clj-kondo-config.edn"}
+
   :source-paths ["src"]
   :resource-paths ["resources"]
   :main ^:skip-aot himmelsstuermer.core

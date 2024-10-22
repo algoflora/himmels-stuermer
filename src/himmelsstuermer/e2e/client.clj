@@ -1,28 +1,34 @@
-(ns himmelsstuermer.impl.e2e.client
+(ns himmelsstuermer.e2e.client
   (:require
-    [himmelsstuermer.impl.e2e.dummy :as dum]
-    [himmelsstuermer.spec.action :as spec.act]
-    [himmelsstuermer.spec.commons :refer [Regexp]]
+    [cheshire.core :as json]
+    [himmelsstuermer.core]
+    [himmelsstuermer.e2e.dummy :as dum]
+    [himmelsstuermer.spec :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
-    [malli.core :as m]
-    [taoensso.timbre :as log]
+    [malli.core :as malli]
+    [malli.generator :refer [generate]]
+    [missionary.core :as m]
+    [taoensso.telemere :as tt]
     [tick.core :as t]))
 
 
 (defonce ^:private update-id (atom 0))
 
-(m/=> send-update [:-> spec.tg/UpdateData :any])
+(malli/=> send-update [:-> spec.tg/Update :any])
 
 
 (defn- send-update
   [data]
-  (let [handler (requiring-resolve 'himmelsstuermer.core/handler)
-        update (assoc data :update_id (swap! update-id inc))]
-    (log/debug ::send-update {:handler handler :update update})
-    (handler update)))
+  (let [handler     (requiring-resolve 'himmelsstuermer.core/handler)
+        update      (assoc data :update_id (swap! update-id inc))
+        mock-record (generate spec/Record)
+        mock-data   {:Records [(assoc mock-record :body (json/encode update))]}]
+    (tt/event! ::send-update {:handler handler :update update})
+    (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
+    (himmelsstuermer.core/-main)))
 
 
-(m/=> send-action-request [:-> spec.act/ActionRequest :any])
+(malli/=> send-action-request [:-> spec/ActionRequest :any])
 
 
 (defn- send-action-request
@@ -31,7 +37,7 @@
     (handler action-request)))
 
 
-(m/=> dummy-kw?->dummy [:-> [:or spec.tg/User :keyword] spec.tg/User])
+(malli/=> dummy-kw?->dummy [:-> [:or spec.tg/User :keyword] spec.tg/User])
 
 
 (defn- dummy-kw?->dummy
@@ -39,7 +45,7 @@
   (if (keyword? dummy) (-> dummy dum/get-by-key :dummy) dummy))
 
 
-(m/=> dummy->base-message [:-> [:or spec.tg/User :keyword] spec.tg/BaseMessage])
+(malli/=> dummy->base-message [:-> [:or spec.tg/User :keyword] spec.tg/BaseMessage])
 
 
 (defn- dummy->base-message
@@ -53,7 +59,7 @@
      :date (System/currentTimeMillis)}))
 
 
-(m/=> call-action [:=> [:cat :keyword :map] :any])
+(malli/=> call-action [:=> [:cat :keyword :map] :any])
 
 
 (defn call-action
@@ -64,23 +70,20 @@
     (send-action-request action-request)))
 
 
-(m/=> send-text [:=>
-                 [:cat [:or spec.tg/User :keyword] :string [:vector spec.tg/MessageEntity]]
-                 :any])
+(malli/=> send-text [:=>
+                     [:cat [:or spec.tg/User :keyword] :string [:vector spec.tg/MessageEntity]]
+                     :any])
 
 
 (defn send-text
   [dummy text entities]
   (let [message (merge (dummy->base-message dummy)
                        {:text text :entities entities})]
-    (log/debug ::send-text-1)
     (dum/add-message message)
-    (log/debug ::send-text-2)
-    (send-update {:message message})
-    (log/debug ::send-text-3)))
+    (send-update {:message message})))
 
 
-(m/=> dummy->base-callback-query [:-> [:or spec.tg/User :keyword] spec.tg/BaseCallbackQuery])
+(malli/=> dummy->base-callback-query [:-> [:or spec.tg/User :keyword] spec.tg/BaseCallbackQuery])
 
 
 (defn- dummy->base-callback-query
@@ -90,17 +93,17 @@
      :from dummy}))
 
 
-(m/=> click-btn [:=>
-                 [:cat
-                  [:or spec.tg/User :keyword]
-                  spec.tg/Message
-                  Regexp]
-                 :any])
+(malli/=> click-btn [:=>
+                     [:cat
+                      [:or spec.tg/User :keyword]
+                      spec.tg/Message
+                      spec/Regexp]
+                     :any])
 
 
 (defn click-btn
   [dummy msg btn-re]
-  (let [base-cbq (merge (dummy->base-callback-query dummy))
+  (let [base-cbq (dummy->base-callback-query dummy)
         buttons  (->> msg :reply_markup :inline_keyboard flatten
                       (filter #(some? (re-find btn-re (:text %)))))]
     (cond
@@ -123,7 +126,7 @@
 (defonce ^:private pre-checkout-queries (atom []))
 
 
-(m/=> send-pre-checkout-query [:=> [:cat spec.tg/User spec.tg/Invoice] :uuid])
+(malli/=> send-pre-checkout-query [:=> [:cat spec.tg/User spec.tg/Invoice] :uuid])
 
 
 (defn send-pre-checkout-query
@@ -142,7 +145,7 @@
 
 (defn set-pre-checkout-query-status
   [pcq-id ok?]
-  (log/debug ::set-pre-checkout-query-status {:pre-checkout-query-id pcq-id :ok? ok?})
+  (tt/event! ::set-pre-checkout-query-status {:pre-checkout-query-id pcq-id :ok? ok?})
   (swap! pre-checkout-queries (fn [pcqs]
                                 (mapv #(if (= (java.util.UUID/fromString pcq-id) (:id %))
                                          (assoc % :approved ok?) %) pcqs))))

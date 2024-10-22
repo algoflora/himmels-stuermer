@@ -1,17 +1,16 @@
 (ns ^:no-doc himmelsstuermer.impl.api
   (:require
     [cheshire.core :refer [generate-string parse-string]]
-    [himmelsstuermer.button :as b]
+    [himmelsstuermer.api.buttons :as b]
+    [himmelsstuermer.impl.buttons :as ib]
     [himmelsstuermer.impl.callbacks :as clb]
+    [himmelsstuermer.impl.db :as db]
     [himmelsstuermer.impl.state :refer [*state*]]
-    ;; [himmelsstuermer.impl.system.app :as app]
-    ;; [himmelsstuermer.impl.user :as u]
     [himmelsstuermer.misc :as misc]
+    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [me.raynes.fs :as fs]
-    ;; [himmelsstuermer.spec.core :as spec]
-    ;; [himmelsstuermer.spec.model :as spec.mdl]
-    ;; [himmelsstuermer.spec.telegram :as spec.tg]
     [missionary.core :as m]
     [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
@@ -34,10 +33,10 @@
                 :time-millis (* 0.000001 nanos)})
     (if (-> resp :body :ok)
       (-> resp :body :result)
-      (tt/error! ::bad-telegram-api-response
-                 {:method method
-                  :data data
-                  :response resp}))))
+      (tt/error! ::bad-telegram-api-response (ex-info "Bad Telegram API response!"
+                                                      {:method method
+                                                       :data data
+                                                       :response resp})))))
 
 
 (defn api-task
@@ -53,7 +52,7 @@
 (malli/=> prepare-keyboard [:=>
                             [:cat
                              [:maybe spec/Buttons]
-                             spec.mdl/User
+                             spec/User
                              :boolean]
                             [:map
                              [:inline_keyboard [:vector
@@ -66,20 +65,18 @@
   (when kbd
     {:inline_keyboard
      (cond-> (mapv (fn [btns] (mapv #(b/to-map % user) btns)) kbd)
-       temp? (conj [(b/to-map (b/->XButton) user)]))}))
+       temp? (conj [(b/to-map (ib/->XButton) user)]))}))
 
 
 (defn- set-callbacks-message-id
   [user msg]
-  (log/debug ::set-callbacks-message-id-1 {})
   (clb/set-new-message-ids
     user
     (:message_id msg)
     (->> msg
          :reply_markup :inline_keyboard flatten
          (map #(some-> % :callback_data java.util.UUID/fromString))
-         (filterv some?)))
-  (log/debug ::set-callbacks-message-id-2 {}))
+         (filterv some?))))
 
 
 (defn- to-edit?
@@ -182,13 +179,19 @@
 (defmethod send-to-chat :invoice
   [_ user b options]
   (let [body (prepare-body b options user)
-        new-msg (api-task :sendInvoice body)]
+        new-msg (m/? (api-task :sendInvoice body))]
     (set-callbacks-message-id user new-msg)))
+
+
+(malli/=> -send-message [:-> :map spec/MissionaryTask])
 
 
 (defn- -send-message
   [request-data]
   (api-task :sendMessage request-data))
+
+
+(malli/=> -edit-message-text [:-> :map spec/MissionaryTask])
 
 
 (defn- -edit-message-text
@@ -200,32 +203,27 @@
                            {:event ::edit-message-text-error
                             :args body
                             :error ex})))
-         (log/warn ::edit-message-failed
-                   "Failed to edit message: %s" (ex-message ex)
-                   {:request body
-                    :error ex})
+         (tt/event! ::edit-message-failed
+                    {:request body
+                     :error ex})
          (-send-message body))))
 
 
 (defmethod send-to-chat :text
   [_ user b options]
-  (let [body       (prepare-body b options user)
-        new-msg    ((if (to-edit? options user) -edit-message-text -send-message) body)
-        new-msg-id (:message_id new-msg)]
-    (log/debug ::send-to-chat-message
-               "Message sent to chat: %s" (:text body)
-               {:user user
-                :body body
-                :options options
-                :response new-msg})
-    (when (and (not (:temp options)) (not= new-msg-id (:msg-id user)))
-      (u/set-msg-id user new-msg-id))
-    (set-callbacks-message-id user new-msg)
-    (log/debug ::sent-to-chat {})
-    new-msg-id))
+  (m/sp (let [body       (prepare-body b options user)
+              new-msg    (m/? ((if (to-edit? options user) -edit-message-text -send-message) body))
+              new-msg-id (:message_id new-msg)]
+          (tt/event! ::text-sent-to-chat {:user user
+                                          :body body
+                                          :new-message-id new-msg-id})
+          (when (and (not (:temp options)) (not= new-msg-id (:msg-id user)))
+            (db/transact [[:db/add [:user/uuid (:user/uuid user)] :user/msg-id new-msg-id]]))
+          (m/? (set-callbacks-message-id user new-msg))
+          new-msg-id)))
 
 
-(defmulti process-args (fn [& args] (first args)))
+(defmulti process-args (fn [a & _] a))
 
 
 (defmethod process-args :text
@@ -249,10 +247,7 @@
     :options {:temp true}}))
 
 
-;; (m/=> send! [:=> [:cat
-;;                   [:or
-;;                    spec.api/TextArgs
-;;                    spec.api/InvoiceArgs]] :int])
+(malli/=> send! [:=> [:cat :keyword spec/User [:* :any]] spec/MissionaryTask])
 
 
 (defn send!
@@ -264,8 +259,8 @@
 (defn- download-file
   [file-path]
   (let [uri (format "https://api.telegram.org/file/bot%s/%s"
-                    @app/bot-token file-path)
-        bis  (-> uri http/get deref :body)
+                    (-> *state* :bot :token) file-path)
+        ^java.io.ByteArrayInputStream bis  (-> uri http/get deref :body)
         file (fs/file fs/temp-dir (java.util.UUID/randomUUID))
         fos  (java.io.FileOutputStream. file)]
     (try
@@ -277,10 +272,10 @@
 
 (defn get-file
   [file-id]
-  (let [file-path (api-task :getFile file-id)]
-    (if (fs/exists? file-path)
-      (fs/file file-path)
-      (download-file file-path))))
+  (m/via m/blk (let [file-path (api-task :getFile file-id)]
+                 (if (fs/exists? file-path)
+                   (fs/file file-path)
+                   (download-file file-path)))))
 
 
 (defn delete-message

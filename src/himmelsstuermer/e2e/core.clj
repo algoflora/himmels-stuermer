@@ -1,10 +1,10 @@
-(ns himmelsstuermer.impl.e2e
+(ns himmelsstuermer.e2e.core
   (:require
-    [himmelsstuermer.impl.e2e.client :as cl]
-    [himmelsstuermer.impl.e2e.dummy :as dum]
+    [himmelsstuermer.e2e.client :as cl]
+    [himmelsstuermer.e2e.dummy :as dum]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as m]
-    [taoensso.timbre :as log]))
+    [taoensso.telemere :as tt]))
 
 
 (defmulti ^:private serve (fn [method _] method))
@@ -14,8 +14,7 @@
 
 (defn request
   [method body]
-  (log/debug ::request-received
-             "Received %s request" method
+  (tt/event! ::e2e-request-received
              {:method method
               :body body})
   (serve method body))

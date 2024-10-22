@@ -1,9 +1,7 @@
 (ns himmelsstuermer.handler
   (:require
     [himmelsstuermer.api :as api]
-    [himmelsstuermer.dynamic :refer [*user* *msg*]]
-    [himmelsstuermer.impl.callbacks :as clb]
-    [himmelsstuermer.impl.system.app :as app]))
+    [himmelsstuermer.api.vars :refer [*user* *msg*]]))
 
 
 (defn delete-this-message
@@ -24,15 +22,6 @@
   [_]
   (api/send-message *user*
                     "Hello from Himmelsstuermer Framework!" []))
-
-
-(defn delete-and-home
-
-  "Handler to delete message. Deletes the message with was called from. Cleanups callbacks. Afterwards run `main` handler"
-
-  [_]
-  (api/delete-message *user* *msg*)
-  (clb/call-func (app/handler-main) {}))
 
 
 (defn payment

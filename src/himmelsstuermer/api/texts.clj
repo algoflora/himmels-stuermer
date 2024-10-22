@@ -1,6 +1,6 @@
-(ns himmelsstuermer.texts
+(ns himmelsstuermer.api.texts
   (:require
-    [himmelsstuermer.dynamic :refer [*user*]]
+    [himmelsstuermer.api.vars :refer [*user*]]
     [himmelsstuermer.impl.texts :as impl]))
 
 

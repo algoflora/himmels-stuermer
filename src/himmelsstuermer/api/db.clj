@@ -1,4 +1,4 @@
-(ns himmelsstuermer.db
+(ns himmelsstuermer.api.db
   (:require
     [himmelsstuermer.impl.db :as impl]))
 
