@@ -3,7 +3,7 @@
     [himmelsstuermer.spec.telegram :as spec.tg]))
 
 
-(def Dummy-Entry
+(def DummyEntry
   [:map
    [:dummy spec.tg/User]
    [:messages [:vector spec.tg/Message]]])

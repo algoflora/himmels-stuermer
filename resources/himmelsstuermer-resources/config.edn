@@ -1,5 +1,5 @@
 {:api/fn  #profile {:aws  himmelsstuermer.impl.api/request
-                    :test himmelsstuermer.impl.e2e/request}
+                    :test himmelsstuermer.e2e.core/request}
 
  :db/conn #profile {:aws  "/mnt/efs/dtlv"
                     :test nil}
@@ -7,8 +7,6 @@
  :bot/default-language-code :en
 
  :bot/roles {}
-
- :logging/level :info
 
  :project/config {}
 

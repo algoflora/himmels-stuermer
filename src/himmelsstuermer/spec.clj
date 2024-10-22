@@ -77,7 +77,7 @@
              [:api-fn fn?]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
-          [:roles [:map-of :keyword [:vector [:or :int :string :keyword]]]]
+          [:roles [:map-of :keyword [:set [:or :int :string]]]]
           [:default-language-code :keyword]]]
    [:actions [:map {:closed true}
               [:namespace :symbol]]]

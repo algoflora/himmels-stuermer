@@ -34,4 +34,6 @@
   (tt/set-middleware! #(assoc % :millis-passed (-> (System/nanoTime) (- @nano-timer) (* 0.000001))))
   (tt/add-handler! :console-json console-json-handler)
   (fs/delete "./logs.edn")
-  (tt/add-handler! :file-edn-disposable file-edn-disposable-handler))
+  (tt/add-handler! :file-edn-disposable file-edn-disposable-handler)
+  (Thread/sleep 1000)
+  (tt/event! ::test-event))

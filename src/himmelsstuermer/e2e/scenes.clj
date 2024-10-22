@@ -201,12 +201,12 @@
                    (dum/exists? key) (-> key dum/get-by-key :dummy)
 
                    (= (-> key name (str/split #"\.") first)
-                      (-> (m/? handler-main) namespace (str/split #"\.") first))
+                      (-> (m/? handler-main) :handler/main namespace (str/split #"\.") first))
                    nil
 
                    :else (-> key dum/new :dummy))
            symb  (-> blueprint first name)
-           func  (resolve (symbol "himmelsstuermer.impl.e2e.flow" symb))
+           func  (resolve (symbol "himmelsstuermer.e2e.scenes" symb))
            args  (->> blueprint rest (take-while #(not (qualified-keyword? %))))]
        (testing (format "> Line:\t%4d\n> Dummy:\t%s\n> Action:\t%s\n> Arguments:\t%s\n" line key symb (str/join " " args))
          (apply func dummy args))

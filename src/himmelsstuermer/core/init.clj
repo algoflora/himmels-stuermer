@@ -14,7 +14,7 @@
               func (requiring-resolve sym)]
           (tt/event! ::init-api-fn {:symbol sym
                                     :function func})
-          {:api/fn func})))
+          {:api/fn @func})))
 
 
 (def ^:private himmelsstuermer-schema
@@ -57,23 +57,25 @@
 (defn- load-role
   [roles rs]
   (let [entries ((first rs) roles)]
-    (flatten (mapv (fn [x]
-                     (cond
-                       (and (keyword? x) (some #{x} (set rs)))
-                       (throw (ex-info "Circular roles dependencies!"
-                                       {:event ::circular-roles-error
-                                        :role x
-                                        :roles roles}))
+    (-> (mapv (fn [x]
+                (cond
+                  (and (keyword? x) (some #{x} (set rs)))
+                  (throw (ex-info "Circular roles dependencies!"
+                                  {:event ::circular-roles-error
+                                   :role x
+                                   :roles roles}))
 
-                       (keyword? x) (load-role roles (conj rs x))
-                       :else x))
-                   entries))))
+                  (keyword? x) (load-role roles (conj rs x))
+                  :else x))
+              entries)
+        flatten
+        set)))
 
 
 (def bot-roles
   (m/sp (let [roles-data (:bot/roles (m/? conf/config))
               roles (into {}
-                          (fn [[k _]] [k (load-role roles-data (list k))])
+                          (map (fn [[k _]] [k (load-role roles-data (list k))]))
                           roles-data)]
           (tt/event! ::init-bot-toles {:roles roles})
           {:bot/roles roles})))
@@ -90,7 +92,7 @@
               func (requiring-resolve sym)]
           (tt/event! ::init-handler-payment {:symbol sym
                                              :function func})
-          {:handler/payment func})))
+          {:handler/payment @func})))
 
 
 (def actions-namespace

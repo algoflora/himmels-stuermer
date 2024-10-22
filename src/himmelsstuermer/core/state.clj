@@ -1,5 +1,6 @@
 (ns himmelsstuermer.core.state
   (:require
+    [clojure.pprint :refer [pprint]]
     [datalevin.core :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.init :as init]
@@ -38,7 +39,8 @@
      :actions {:namespace (:actions/namespace data)}
      :handlers {:main (:handler/main data)
                 :payment (:handler/payment data)}
-     :project (merge (project-info)
+     :project (assoc (project-info)
+                     :config
                      (:project/config data))
      :database nil
      :transaction #{}
@@ -55,8 +57,13 @@
 (def state
   (m/sp (let [profile (m/? conf/profile)]
           (init-logging! (project-info) profile)
-          (when (System/getProperty  "himmelsstuermer.malli.instrument" false)
-            (instrument!))
+          (when (System/getProperty  "himmelsstuermer.malli.instrument" "false")
+            (tt/event! ::malli-instrument-run {})
+            (instrument! {:report (fn [type data]
+                                    (let [[s v] (case type
+                                                  :malli.core/invalid-input  [(:input data)  (:args data)]
+                                                  :malli.core/invalid-output [(:output data) (:value data)])]
+                                      (pprint (malli/explain s v))))}))
           (let [state (m/? (m/join (partial create-state profile)
                                    init/api-fn
                                    init/db-conn

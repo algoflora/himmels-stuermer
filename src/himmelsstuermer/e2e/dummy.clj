@@ -17,7 +17,7 @@
 
 
 (defn- create
-  ([key] (create key (m/? bot-default-language-code)))
+  ([key] (create key (:bot/default-language-code (m/? bot-default-language-code))))
   ([key lang]
    {:id (inc (count @dummies))
     :is_bot false
@@ -26,7 +26,7 @@
     :language_code (name lang)}))
 
 
-(malli/=> new [:-> :keyword spec.e2e/Dummy-Entry])
+(malli/=> new [:-> :keyword spec.e2e/DummyEntry])
 
 
 (defn new
@@ -39,7 +39,7 @@
   (reset! dummies {}))
 
 
-(malli/=> dump-all [:=> [:cat] [:map-of :keyword spec.e2e/Dummy-Entry]])
+(malli/=> dump-all [:=> [:cat] [:map-of :keyword spec.e2e/DummyEntry]])
 
 
 (defn dump-all
@@ -47,7 +47,7 @@
   @dummies)
 
 
-(malli/=> restore [:-> [:maybe [:map-of :keyword spec.e2e/Dummy-Entry]] :any])
+(malli/=> restore [:-> [:maybe [:map-of :keyword spec.e2e/DummyEntry]] :any])
 
 
 (defn restore
@@ -55,7 +55,7 @@
   (reset! dummies (or data {})))
 
 
-(malli/=> get-by-chat-id [:-> :int spec.e2e/Dummy-Entry])
+(malli/=> get-by-chat-id [:-> :int spec.e2e/DummyEntry])
 
 
 (defn- get-by-chat-id
@@ -73,7 +73,7 @@
   (contains? @dummies key))
 
 
-(malli/=> get-by-key [:-> :keyword spec.e2e/Dummy-Entry])
+(malli/=> get-by-key [:-> :keyword spec.e2e/DummyEntry])
 
 
 (defn get-by-key
