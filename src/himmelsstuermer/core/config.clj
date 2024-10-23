@@ -10,10 +10,10 @@
 
 
 (def profile
-  (m/sp (some-> (or (System/getProperty "himmelsstuermer.profile")
-                    (System/getenv "HIMMELSSTUERMER_PROFILE"))
-                str/lower-case
-                keyword)))
+  (delay (some-> (or (System/getProperty "himmelsstuermer.profile")
+                     (System/getenv "HIMMELSSTUERMER_PROFILE"))
+                 str/lower-case
+                 keyword)))
 
 
 (defmethod reader 'prop
@@ -23,21 +23,21 @@
 
 (def himmelsstuermer-config
   (m/sp
-    (let [profile (m/? profile)
+    (let [profile @profile
           cfg (read-config (io/resource "himmelsstuermer-resources/config.edn")
                            {:profile profile})]
-      (tt/event! ::himmelstuermer-config-file-loaded {:profile profile
-                                                      :config cfg})
+      (tt/event! ::himmelstuermer-config-file-loaded {:data {:profile profile
+                                                             :config cfg}})
       cfg)))
 
 
 (def project-config
   (m/sp
-    (let [profile (m/? profile)
+    (let [profile @profile
           cfg (read-config (io/resource "config.edn")
                            {:profile profile})]
-      (tt/event! ::project-config-file-loaded {:profile profile
-                                               :config cfg})
+      (tt/event! ::project-config-file-loaded {:data {:profile profile
+                                                      :config cfg}})
       cfg)))
 
 
@@ -54,5 +54,5 @@
 (def config
   (m/sp
     (let [cfg (m/? (m/join merge-configs himmelsstuermer-config project-config))]
-      (tt/event! ::config-loaded {:config cfg})
+      (tt/event! ::config-loaded {:data {:config cfg}})
       cfg)))

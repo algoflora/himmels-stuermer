@@ -5,6 +5,7 @@
 
              taoensso.telemere/*ctx*
              taoensso.telemere/add-handler!
+             taoensso.telemere/get-handlers
              taoensso.telemere/handler:console
              taoensso.telemere/handler:file
              taoensso.telemere/pr-signal-fn

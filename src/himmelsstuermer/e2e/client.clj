@@ -19,11 +19,11 @@
 
 (defn- send-update
   [data]
-  (let [handler     (requiring-resolve 'himmelsstuermer.core/handler)
-        update      (assoc data :update_id (swap! update-id inc))
+  (let [update      (assoc data :update_id (swap! update-id inc))
         mock-record (generate spec/Record)
-        mock-data   {:Records [(assoc mock-record :body (json/encode update))]}]
-    (tt/event! ::send-update {:handler handler :update update})
+        mock-data   {:body {:Records [(assoc mock-record :body (json/encode update))]}
+                     :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
+    (tt/event! ::send-update {:data {:update update :mock-data mock-data}})
     (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
     (himmelsstuermer.core/-main)))
 

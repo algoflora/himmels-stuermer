@@ -31,7 +31,7 @@
 
 (defn new
   [k]
-  (k (swap! dummies assoc key {:dummy (create k) :messages []})))
+  (k (swap! dummies assoc k {:dummy (create k) :messages []})))
 
 
 (defn clear-all

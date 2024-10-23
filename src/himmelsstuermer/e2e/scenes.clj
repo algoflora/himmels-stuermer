@@ -30,7 +30,7 @@
   (let [key   (-> dummy :username keyword)
         dummy (dum/get-by-key key)]
     (println (format "Dumping dummy %s\n%s" key (with-out-str (pprint dummy))))
-    (tt/event! ::dumping-dummy {:dummy dummy})))
+    (tt/event! ::dumping-dummy {:data {:dummy dummy}})))
 
 
 (malli/=> get-message [:=> [:cat spec.tg/User [:maybe [:int {:min 1}]]] spec.tg/Message])
@@ -110,6 +110,7 @@
                                    (is (= exp (set entities))))
         (some? caption_entities) (testing ">>> Checking caption entities...\n\n"
                                    (is (= exp (set caption_entities))))
+        (empty? exp)             (is true)
         :else (is false "No entities or caption_entities!")))
 
 
@@ -120,9 +121,8 @@
   [dummy & args]
   (let [[num args] (if (-> args first pos-int?) [(first args) (rest args)] [nil args])
         msg (get-message dummy num)]
-    (testing "> Function:\tcheck-msg\n"
-      (doseq [arg args]
-        (-check-message msg arg)))))
+    (doseq [arg args]
+      (-check-message msg arg))))
 
 
 (malli/=> check-invoice [:=> [:cat spec.tg/User [:? :int] spec.bp/CheckInvoiceBlueprintEntryArgs] :nil])
@@ -134,14 +134,13 @@
   ([dummy title description currency prices buttons]
    (check-invoice dummy 1 title description currency prices buttons))
   ([dummy num title description currency prices buttons]
-   (testing "> Function:\tcheck-invoice\n"
-     (let [{:keys [invoice] :as msg} (get-message dummy num)]
-       (testing ">>> Checking invoice exists...\n\n"      (is (some? invoice)))
-       (testing ">>> Checking invoice title...\n\n"       (is (= title (:title invoice))))
-       (testing ">>> Checking invoice description...\n\n" (is (= description (:description invoice))))
-       (testing ">>> Checking invoice currency...\n\n"    (is (= currency (:currency invoice))))
-       (testing ">>> Checking invoice prices...\n\n"      (is (= prices (:prices invoice))))
-       (-check-message msg buttons)))))
+   (let [{:keys [invoice] :as msg} (get-message dummy num)]
+     (testing ">>> Checking invoice exists...\n\n"      (is (some? invoice)))
+     (testing ">>> Checking invoice title...\n\n"       (is (= title (:title invoice))))
+     (testing ">>> Checking invoice description...\n\n" (is (= description (:description invoice))))
+     (testing ">>> Checking invoice currency...\n\n"    (is (= currency (:currency invoice))))
+     (testing ">>> Checking invoice prices...\n\n"      (is (= prices (:prices invoice))))
+     (-check-message msg buttons))))
 
 
 (defn- pay-invoice
@@ -208,7 +207,7 @@
            symb  (-> blueprint first name)
            func  (resolve (symbol "himmelsstuermer.e2e.scenes" symb))
            args  (->> blueprint rest (take-while #(not (qualified-keyword? %))))]
-       (testing (format "> Line:\t%4d\n> Dummy:\t%s\n> Action:\t%s\n> Arguments:\t%s\n" line key symb (str/join " " args))
+       (testing (format "> Line:\t\t%4d\n> Dummy:\t%s\n> Action:\t%s\n> Arguments:\t%s\n" line key symb (str/join " " args))
          (apply func dummy args))
        (apply-blueprint (drop (+ 1 (count args)) blueprint) (inc line))))))
 

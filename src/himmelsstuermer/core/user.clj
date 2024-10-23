@@ -37,15 +37,17 @@
 (defn- create
   [handler-main udata]
   (let [uuid (random-uuid)
-        user {:db/id -1
-              :user/uuid uuid
-              :user/id (:id udata)
-              :user/username (:username udata)
-              :user/first-name (:first_name udata)
-              :user/last-name (:last_name udata)
-              :user/language-code (:language_code udata)}]
-    (tt/event! ::user-create {:user user})
-    [user [(into {} (filter #(-> % second some?)) user)
+        user (into {}
+                   (filter #(-> % second some?))
+                   {:db/id -1
+                    :user/uuid uuid
+                    :user/id (:id udata)
+                    :user/username (:username udata)
+                    :user/first-name (:first_name udata)
+                    :user/last-name (:last_name udata)
+                    :user/language-code (:language_code udata)})]
+    (tt/event! ::user-create {:data {:user user}})
+    [user [user
            {:callback/uuid uuid
             :callback/function handler-main
             :callback/arguments {}
@@ -92,7 +94,7 @@
                function         (requiring-resolve (or (:callback/function callback?) (-> state :handlers :main)))
                arguments        (assoc (or (:callback/arguments callback?) {}) :message (:message state))
                task             (apply function (if (sequential? arguments) arguments [arguments]))]
-           (tt/event! ::user-loaded {:user user})
+           (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
                                     (and (not= (-> state :handlers :main) (:callback/function user-callback?))
                                          (false? (:calllback/service? callback?)))
@@ -102,7 +104,5 @@
 
                                     :always (->
                                               (assoc :user user)
-                                              (assoc :function function)
-                                              (assoc :arguments arguments)
                                               (update :tasks conj task)
                                               (update :transaction into tx-data))))))))

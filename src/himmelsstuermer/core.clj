@@ -25,7 +25,7 @@
 
 (defmethod handle-update- :message
   [_ {:keys [message] :as state}]
-  (m/sp (tt/event! ::handle-message {:message message})
+  (m/sp (tt/event! ::handle-message {:data {:message message}})
         (let [state' (m/? (u/load-to-state state (:from message)))]
           (s/modify-state state' #(update
                                     % :tasks
@@ -35,9 +35,11 @@
 (defmethod handle-update- :callback-query
   [_ {:keys [callback-query] :as state}]
   (m/sp (tt/event! ::handle-callback-query {:callback-query callback-query})
-        (m/? (u/load-to-state state (:from callback-query) (-> callback-query
-                                                               :data
-                                                               java.util.UUID/fromString)))))
+        (m/? (let [st (u/load-to-state state (:from callback-query) (-> callback-query
+                                                                        :data
+                                                                        java.util.UUID/fromString))]
+               (tt/event! ::test-state {:data {:st st}})
+               st))))
 
 
 (defmethod handle-update- :pre-checkout-query ; TODO: Add comprehensive processing of pre-checkout-query
@@ -62,7 +64,7 @@
 (defn- handle-update
   [{:keys [update] :as state}]
   (m/sp
-    (tt/event! ::handle-update {:update update})
+    (tt/event! ::handle-update {:data {:update update}})
     (let [type  (some #{:message :callback_query :pre_checkout_query} (keys update))
           type' (hyphenize-kw type)]
       (m/? (handle-update- type' (s/modify-state state #(assoc % type' (type update))))))))
@@ -73,7 +75,7 @@
 
 (defn- handle-action
   [{:keys [action] :as state}]
-  (m/sp (tt/event! ::handle-action {:action action})
+  (m/sp (tt/event! ::handle-action {:data {:action action}})
         (let [args (:arguments action)
               task (apply
                      (requiring-resolve (symbol (-> state :actions :namespace str) (:method action)))
@@ -86,7 +88,7 @@
 
 (defn handle
   [state record]
-  (m/sp (tt/event! ::handle-core {:record record}) ; TODO: check "private" chats, "/start" command, etc...
+  (m/sp (tt/event! ::handle-core {:data {:record record}}) ; TODO: check "private" chats, "/start" command, etc...
         (let [state'  (s/modify-state state #(assoc % :database (-> state :system :db-conn d/db)))
               body    (-> record :body (json/decode keyword))
               state'' (cond
@@ -103,8 +105,9 @@
                     himmelsstuermer.api.vars/*config*  (some-> state'' :project :config)
                     himmelsstuermer.impl.db/*tx*       tx-data
                     himmelsstuermer.impl.state/*state* state'']
-            (tt/event! ::running-tasks)
-            (m/? (apply m/join (constantly nil) (:tasks state''))))
+            (bound-fn []
+              (tt/event! ::running-tasks)
+              (m/? (apply m/join (constantly nil) (:tasks state'')))))
           ;; TODO: Research situation when message sent, button clicked but transaction still not complete
           (tt/event! ::transact-data {:tx-data @tx-data
                                       :tx-report (d/transact! (-> state'' :system :db-conn) @tx-data)})
@@ -135,17 +138,17 @@
 
 (def app
   (m/ap (let [initial-state (m/? s/state)]
+          (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
           (try (let [{:keys [body
-                             headers]} (m/?> invocations)
+                             headers] :as inv} (m/?> invocations)
+                     _ (tt/event! ::invocation-is-here {:data {:body body :headers headers :invocation inv}})
                      id                (get headers "lambda-runtime-aws-request-id")
-                     state             (merge initial-state {:aws-context headers})]
-
-                 (tt/set-ctx! (merge tt/*ctx* {:state state}))
+                     state             (s/modify-state initial-state #(assoc % :aws-context headers))]
 
                  (try (m/?
                         (m/reduce conj
                                   (m/ap
-                                    (let [record (m/?> (m/seed (:Records (json/decode body keyword))))]
+                                    (let [record (m/?> (m/seed (:Records body)))]
                                       (reset-nano-timer!)
                                       (m/? (handle state record))))))
                       (tt/event! ::invocation-response-ok {:invocation-id id})
@@ -153,7 +156,7 @@
                                  {:body "OK"})
 
                       (catch Exception ex
-                        (tt/error! ::unhandled-exceprion ex)
+                        (tt/error! ::unhandled-exception ex)
                         (http/post (str runtime-api-url "invocation/" id "/error")
                                    {:body (json/encode (throwable->error-body ex))}))))
                (finally (s/shutdown! initial-state))))))

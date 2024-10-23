@@ -7,7 +7,8 @@
 
 
 (def MissionaryTask
-  [:fn #(instance? clojure.lang.RestFn %)]) ; TODO: Wait for Missionary update about meta or smth...
+  :any
+  #_[:fn #(instance? clojure.lang.RestFn %)]) ; TODO: Wait for Missionary update about meta or smth...
 
 
 (def Regexp
@@ -53,7 +54,7 @@
    [:user/username {:optional true} :string]
    [:user/id :int]
    [:user/first-name :string]
-   [:user/last-name {:optional true} :string]
+   [:user/last-name {:optional true} [:maybe :string]]
    [:user/language-code {:optional true} :string]
    [:user/msg-id {:optional true} :int]])
 

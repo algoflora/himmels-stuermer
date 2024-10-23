@@ -4,7 +4,6 @@
     [datalevin.core :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.init :as init]
-    [himmelsstuermer.core.logging :refer [init-logging!]]
     [himmelsstuermer.spec :as spec]
     [malli.core :as malli]
     [malli.instrument :refer [instrument!]]
@@ -55,15 +54,17 @@
 
 
 (def state
-  (m/sp (let [profile (m/? conf/profile)]
-          (init-logging! (project-info) profile)
+  (m/sp (let [profile @conf/profile]
           (when (System/getProperty  "himmelsstuermer.malli.instrument" "false")
-            (tt/event! ::malli-instrument-run {})
+            (tt/event! ::malli-instrument-run)
             (instrument! {:report (fn [type data]
                                     (let [[s v] (case type
                                                   :malli.core/invalid-input  [(:input data)  (:args data)]
-                                                  :malli.core/invalid-output [(:output data) (:value data)])]
-                                      (pprint (malli/explain s v))))}))
+                                                  :malli.core/invalid-output [(:output data) (:value data)]
+                                                  nil)]
+                                      (tt/error! (malli/-exception
+                                                   type
+                                                   (merge (if (some? s) (malli/explain s v) {}) data)))))}))
           (let [state (m/? (m/join (partial create-state profile)
                                    init/api-fn
                                    init/db-conn
@@ -74,7 +75,7 @@
                                    init/handler-payment
                                    init/actions-namespace
                                    init/project-config))]
-            (tt/event! ::state-created state)
+            (tt/event! ::state-created {:data state})
             state))))
 
 
@@ -85,7 +86,8 @@
   [state modify-fn]
   (let [state' (modify-fn state)]
     (tt/set-ctx! (assoc tt/*ctx* :state state'))
-    (tt/event! ::state-modified)
+    (tt/event! ::state-modified {:data {:old-state state
+                                        :new-state state'}})
     state'))
 
 

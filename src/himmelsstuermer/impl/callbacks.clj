@@ -34,9 +34,9 @@
                          :callback/service? is-service
                          :callback/user [:user/uuid (:user/uuid user)]}]]
            (db/transact tx-data)
-           (tt/event! ::callback-create {:user user
-                                         :function f
-                                         :arguments args})
+           (tt/event! ::callback-create {:data {:user user
+                                                :function f
+                                                :arguments args}})
            uuid))))
 
 
