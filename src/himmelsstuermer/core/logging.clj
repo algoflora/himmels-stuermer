@@ -2,7 +2,6 @@
   (:require
     [cheshire.core :as json]
     [cheshire.generate :as gen]
-    [clojure.string :as str]
     [clojure.walk :refer [prewalk]]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.state :as s]
@@ -22,6 +21,7 @@
 
 (defn reset-nano-timer!
   []
+  (tt/event! ::reset-nano-timer)
   (reset! nano-timer (System/nanoTime)))
 
 
@@ -62,7 +62,7 @@
 (defn- transform-malli-scheme
   [sch]
   (let [form (malli/form sch)]
-    (if (-> form str count (> 10000))
+    (if (-> form str count (> 3000))
       "<BIG MALLI SCHEME>"
       form)))
 
@@ -78,22 +78,29 @@
     (malli/schema? obj) transform-malli-scheme))
 
 
+(defn- shutdown-hook
+  [& args]
+  (tt/event! ::shutdown-hook {:data {:args args}})
+  (tt/stop-handlers!))
+
+
 (defn init-logging!
   [project-info profile]
+  (tt/call-on-shutdown! shutdown-hook)
   (tt/remove-handler! :default/console)
   (when (= :aws profile)
     (tt/add-handler! :console-json console-json-handler))
   (when (= :test profile)
     (tt/add-handler! :console-event-id console-event-id-handler)
-    (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
+    ;; (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
     (tt/add-handler! :file-edn-disposable (file-edn-disposable-handler)))
   (tt/set-ctx! {:project project-info :profile profile})
   (tt/set-middleware! (fn [signal]
                         (let [signal' (prewalk walk signal)
                               nt @nano-timer]
                           (cond-> signal'
-                            (some? nt) (assoc :millis-passed
-                                              (-> (System/nanoTime) (- nt) (* 0.000001)))))))
+                            (some? nt) (assoc-in [:data :millis-passed]
+                                                 (-> (System/nanoTime) (- nt) (* 0.000001)))))))
   (tt/event! ::logging-initialized {:data {:handlers (tt/get-handlers)}}))
 
 

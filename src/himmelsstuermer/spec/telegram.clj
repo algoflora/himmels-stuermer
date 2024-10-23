@@ -153,14 +153,14 @@
                                 [:from User]
                                 [:message_id :int]
                                 [:date [:= 0]]]]]
-   [:chat_instance :string]
+   [:chat_instance {:optional true} :string]
    [:data {:optional true} [:string {:min 1 :max 64}]]])
 
 
 (def CallbackQueryUpdate
   [:map {:closed true}
    [:update_id {:optional true} :int]
-   [:callbacK_query CallbackQuery]])
+   [:callback_query CallbackQuery]])
 
 
 (def PreCheckoutQuery

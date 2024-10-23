@@ -119,5 +119,4 @@
 
 (defn shutdown!
   [state]
-  (d/close (-> state :system :db-conn))
-  (tt/stop-handlers!))
+  (d/close (-> state :system :db-conn)))

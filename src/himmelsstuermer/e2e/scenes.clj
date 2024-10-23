@@ -121,6 +121,8 @@
   [dummy & args]
   (let [[num args] (if (-> args first pos-int?) [(first args) (rest args)] [nil args])
         msg (get-message dummy num)]
+    (tt/event! ::check-msg {:data {:message msg
+                                   :arguments args}})
     (doseq [arg args]
       (-check-message msg arg))))
 
@@ -135,6 +137,8 @@
    (check-invoice dummy 1 title description currency prices buttons))
   ([dummy num title description currency prices buttons]
    (let [{:keys [invoice] :as msg} (get-message dummy num)]
+     (tt/event! ::check-invoice {:data {:message msg
+                                        :arguments [title description currency prices buttons]}})
      (testing ">>> Checking invoice exists...\n\n"      (is (some? invoice)))
      (testing ">>> Checking invoice title...\n\n"       (is (= title (:title invoice))))
      (testing ">>> Checking invoice description...\n\n" (is (= description (:description invoice))))
@@ -208,8 +212,11 @@
            func  (resolve (symbol "himmelsstuermer.e2e.scenes" symb))
            args  (->> blueprint rest (take-while #(not (qualified-keyword? %))))]
        (testing (format "> Line:\t\t%4d\n> Dummy:\t%s\n> Action:\t%s\n> Arguments:\t%s\n" line key symb (str/join " " args))
+         (tt/event! ::apply-blueprint-function {:data {:dummy dummy
+                                                       :function symb
+                                                       :argument args}})
          (apply func dummy args))
-       (apply-blueprint (drop (+ 1 (count args)) blueprint) (inc line))))))
+       (apply-blueprint (drop (inc (count args)) blueprint) (inc line))))))
 
 
 (defmulti ^:private sub-flow (fn [_ x & _] (cond (fn? x) :function (vector? x) :vector)))

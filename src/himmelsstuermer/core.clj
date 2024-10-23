@@ -111,8 +111,12 @@
                (tt/event! ::running-tasks {:data {:tasks (:tasks state'')}})
                (m/? (apply m/join (constantly nil) (:tasks state''))))))
           ;; TODO: Research situation when message sent, button clicked but transaction still not complete
-          (tt/event! ::transact-data {:tx-data @tx-data
-                                      :tx-report (d/transact! (-> state'' :system :db-conn) @tx-data)})
+          (let [txd (vec @tx-data)
+                _ (tt/event! ::transact-data {:data {:tx-data txd}})
+                tx-data' (into []
+                               (map (comp vec seq))
+                               (:tx-data (d/transact! (-> state'' :system :db-conn) (vec @tx-data))))]
+            (tt/event! ::transacted-data {:data {:tx-data tx-data'}}))
           (tt/set-ctx! nil))))
 
 

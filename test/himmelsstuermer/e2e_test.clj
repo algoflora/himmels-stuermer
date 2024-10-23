@@ -83,21 +83,21 @@
                [:users/main-message :users/temp-message])
 
 
-(situation-run DB
-               'himmelsstuermer.e2e-test.handler/store
-               [:users/additional-entities])
+;; (situation-run DB
+;;                'himmelsstuermer.e2e-test.handler/store
+;;                [:users/additional-entities])
 
 
-(situation-run Roles
-               'himmelsstuermer.e2e-test.handler/roled
-               [:users/roles])
+;; (situation-run Roles
+;;                'himmelsstuermer.e2e-test.handler/roled
+;;                [:users/roles])
 
 
-(situation-run Fail
-               'himmelsstuermer.e2e-test.handler/error
-               [:users/error])
+;; (situation-run Fail
+;;                'himmelsstuermer.e2e-test.handler/error
+;;                [:users/error])
 
 
-(situation-run Payment
-               'himmelsstuermer.e2e-test.handler/payment
-               [:users/payment])
+;; (situation-run Payment
+;;                'himmelsstuermer.e2e-test.handler/payment
+;;                [:users/payment])

@@ -10,15 +10,15 @@
 
 (malli/=> set-callback
           [:function
-           [:=> [:cat spec/User :symbol [:maybe :map]] spec/MissionaryTask]
-           [:=> [:cat spec/User :symbol [:maybe :map] :boolean] spec/MissionaryTask]
+           [:=> [:cat spec/User :symbol [:maybe :map]] :uuid]
+           [:=> [:cat spec/User :symbol [:maybe :map] :boolean] :uuid]
            [:=> [:cat
                  spec/User
                  :symbol
                  [:maybe :map]
                  :boolean
                  :uuid]
-            spec/MissionaryTask]])
+            :uuid]])
 
 
 (defn set-callback
@@ -27,17 +27,17 @@
   ([user f args is-service]
    (set-callback user f args is-service (java.util.UUID/randomUUID)))
   ([user f args is-service uuid]
-   (m/sp (let [args (or args {})
-               tx-data [{:callback/uuid uuid
-                         :callback/function f
-                         :callback/arguments args
-                         :callback/service? is-service
-                         :callback/user [:user/uuid (:user/uuid user)]}]]
-           (db/transact tx-data)
-           (tt/event! ::callback-create {:data {:user user
-                                                :function f
-                                                :arguments args}})
-           uuid))))
+   (let [args (or args {})
+         tx-data [{:callback/uuid uuid
+                   :callback/function f
+                   :callback/arguments args
+                   :callback/service? is-service
+                   :callback/user (:db/id user)}]]
+     (db/transact tx-data)
+     (tt/event! ::callback-create {:data {:user user
+                                          :function f
+                                          :arguments args}})
+     uuid)))
 
 
 (malli/=> delete [:=> [:cat spec/User :int] spec/MissionaryTask])

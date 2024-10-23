@@ -2,7 +2,8 @@
   (:require
     [himmelsstuermer.api.vars :refer [*user*]]
     [himmelsstuermer.impl.callbacks :as clb]
-    [himmelsstuermer.impl.state :refer [*state*]]))
+    [himmelsstuermer.impl.state :refer [*state*]]
+    [missionary.core :as m]))
 
 
 (defn has-role?
@@ -28,4 +29,4 @@
   ([func] (set-handler func {}))
   ([func args] (set-handler func args *user*))
   ([func args user]
-   (clb/set-callback user func args false (:user/uuid user))))
+   (m/sp (clb/set-callback user func args false (:user/uuid user)))))

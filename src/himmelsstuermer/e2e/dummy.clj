@@ -5,7 +5,8 @@
     [himmelsstuermer.spec.e2e :as spec.e2e]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
-    [missionary.core :as m]))
+    [missionary.core :as m]
+    [taoensso.telemere :as tt]))
 
 
 (defonce ^:private dummies (atom {}))
@@ -126,24 +127,27 @@
 (defn add-message
   [r]
   (let [req (prepare-request r)
-        {:keys [dummy messages]} (get-by-chat-id (or (:chat_id req) (-> req :chat :id)))]
+        {:keys [dummy messages]} (get-by-chat-id (or (:chat_id req) (-> req :chat :id)))
+        base-message {:message_id (-> messages
+                                      last
+                                      :message_id
+                                      (or 0)
+                                      inc)
+                      :from {:id 0
+                             :is_bot true
+                             :first_name "himmelsstuermer"
+                             :last_name "e2e"
+                             :username "himmelsstuermer.e2e"
+                             :language_code "clj"}
+                      :chat {:id (:id dummy)
+                             :type "private"}
+                      :date (System/currentTimeMillis)}
+        message (merge base-message (dissoc req :chat_id))]
     (swap! dummies (fn [dms]
                      (update-in dms [(-> dummy :username keyword) :messages]
-                                conj (merge {:message_id (-> messages
-                                                             last
-                                                             :message_id
-                                                             (or 0)
-                                                             inc)
-                                             :from {:id 0
-                                                    :is_bot true
-                                                    :first_name "himmelsstuermer"
-                                                    :last_name "e2e"
-                                                    :username "himmelsstuermer.e2e"
-                                                    :language_code "clj"}
-                                             :chat {:id (:id dummy)
-                                                    :type "private"}
-                                             :date (System/currentTimeMillis)}
-                                            (dissoc req :chat_id)))))
+                                conj message)))
+    (tt/event! ::added-message {:data {:message message
+                                       :dummy ((-> dummy :username keyword) @dummies)}})
     (first (get-last-messages dummy 1 nil))))
 
 
@@ -170,19 +174,22 @@
   [req]
   (let [{:keys [dummy messages]} (get-by-chat-id (or (:chat_id req) (-> req :chat :id)))
         msg-idx (find-message-index messages (:message_id req))
-        key (-> dummy :username keyword)
+        k (-> dummy :username keyword)
         dummies# (swap! dummies
                         (fn [dms]
                           (update-in
-                            dms [key :messages]
+                            dms [k :messages]
                             (fn [msgs]
                               (update msgs
                                       msg-idx
                                       #(merge % (remove-nils
                                                   {:text (:text req)
                                                    :entities (:entities req)
-                                                   :reply_markup (:reply_markup req)})))))))]
-    (get-in dummies# [key :messages msg-idx])))
+                                                   :reply_markup (:reply_markup req)})))))))
+        message (get-in dummies# [k :messages msg-idx])]
+    (tt/event! ::updated-message-text {:data {:message message
+                                              :dummy (k dummies#)}})
+    message))
 
 
 (malli/=> delete-message [:=> [:cat :int :int] :boolean])
@@ -193,8 +200,9 @@
   (let [dummy (:dummy (get-by-chat-id chat-id))
         k     (-> dummy :username keyword)]
     (swap! dummies (fn [dms]
-                     (update-in dms [key :messages]
+                     (update-in dms [k :messages]
                                 (fn [msgs]
                                   (into [] (filter #(not= message-id (:message_id %)) msgs))))))
-    ;; TODO: Maybe just `true` later
+    (tt/event! ::deleted-message {:data {:mesage-id message-id
+                                         :dummy (k @dummies)}})
     (empty? (filter #(= message-id (:message_id %)) (-> @dummies k :messages)))))

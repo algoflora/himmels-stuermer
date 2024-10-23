@@ -212,6 +212,10 @@
 (defmethod send-to-chat :text
   [_ user b options]
   (m/sp (let [body       (prepare-body b options user)
+              _ (tt/event! ::to-edit? {:let [toedit? (to-edit? options user)]
+                                       :data {:options options
+                                              :user user
+                                              :to-edit? toedit?}})
               new-msg    (m/? ((if (to-edit? options user) -edit-message-text -send-message) body))
               new-msg-id (:message_id new-msg)]
           (tt/event! ::text-sent-to-chat {:data {:user user

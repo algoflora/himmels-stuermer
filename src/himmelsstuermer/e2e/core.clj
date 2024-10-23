@@ -14,7 +14,7 @@
 
 (defn request
   [method body]
-  (tt/event! ::e2e-request-received
+  (tt/event! ::request-received
              {:data {:method method
                      :body body}})
   (serve method body))
@@ -22,24 +22,29 @@
 
 (defmethod serve :sendMessage
   [_ req]
+  (tt/event! ::serve-sendMessage {:data {:request req}})
   (dum/add-message req))
 
 
 (defmethod serve :editMessageText
   [_ req]
+  (tt/event! ::serve-editMessageText {:data {:request req}})
   (dum/update-message-text req))
 
 
 (defmethod serve :deleteMessage
-  [_ {:keys [chat_id message_id]}]
+  [_ {:keys [chat_id message_id] :as req}]
+  (tt/event! ::serve-deleteMessage {:data {:request req}})
   (dum/delete-message chat_id message_id))
 
 
 (defmethod serve :sendInvoice
   [_ req]
+  (tt/event! ::serve-sendInvoice {:data {:request req}})
   (dum/add-message req))
 
 
 (defmethod serve :answerPrecheckoutQuery
   [_ req]
+  (tt/event! ::serve-answerPrecheckoutQuery {:data {:request req}})
   (cl/set-pre-checkout-query-status (:pre_checkout_query_id req) (:ok req)))

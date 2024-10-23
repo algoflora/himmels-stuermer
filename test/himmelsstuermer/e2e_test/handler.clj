@@ -12,7 +12,7 @@
 
 
 (defn main
-  [msg]
+  [{msg :message}]
   (let [text (or (:text msg) "stranger")]
     (api/send-message *user*
                       (format "Hi, %s!" text)
