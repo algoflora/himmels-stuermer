@@ -52,7 +52,8 @@
 
 
 (def config
-  (m/sp
-    (let [cfg (m/? (m/join merge-configs himmelsstuermer-config project-config))]
-      (tt/event! ::config-loaded {:data {:config cfg}})
-      cfg)))
+  (m/memo
+    (m/via m/blk
+           (let [cfg (m/? (m/join merge-configs himmelsstuermer-config project-config))]
+             (tt/event! ::config-loaded {:data {:config cfg}})
+             cfg))))

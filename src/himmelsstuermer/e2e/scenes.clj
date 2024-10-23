@@ -52,8 +52,8 @@
   ([dummy text] (send-text dummy text []))
   ([dummy text entities]
    (tt/event! ::dummy-send-text
-              {:dummy dummy
-               :text text})
+              {:data {:dummy dummy
+                      :text text}})
    (cl/send-text dummy (str text) entities)))
 
 
@@ -66,9 +66,9 @@
   ([dummy num? btn-re]
    (let [msg (get-message dummy num?)]
      (tt/event! ::dummy-click-btn
-                {:dummy dummy
-                 :button btn-re
-                 :message msg})
+                {:data {:dummy dummy
+                        :button btn-re
+                        :message msg}})
      (cl/click-btn dummy msg (str?->re btn-re)))))
 
 

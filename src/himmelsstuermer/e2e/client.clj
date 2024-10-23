@@ -145,7 +145,8 @@
 
 (defn set-pre-checkout-query-status
   [pcq-id ok?]
-  (tt/event! ::set-pre-checkout-query-status {:pre-checkout-query-id pcq-id :ok? ok?})
+  (tt/event! ::set-pre-checkout-query-status
+             {:data {:pre-checkout-query-id pcq-id :ok? ok?}})
   (swap! pre-checkout-queries (fn [pcqs]
                                 (mapv #(if (= (java.util.UUID/fromString pcq-id) (:id %))
                                          (assoc % :approved ok?) %) pcqs))))

@@ -10,15 +10,15 @@
 
 (malli/=> set-callback
           [:function
-           [:=> [:cat spec/User :symbol [:maybe :map]] :uuid]
-           [:=> [:cat spec/User :symbol [:maybe :map] :boolean] :uuid]
+           [:=> [:cat spec/User :symbol [:maybe :map]] spec/MissionaryTask]
+           [:=> [:cat spec/User :symbol [:maybe :map] :boolean] spec/MissionaryTask]
            [:=> [:cat
                  spec/User
                  :symbol
                  [:maybe :map]
                  :boolean
                  :uuid]
-            :uuid]])
+            spec/MissionaryTask]])
 
 
 (defn set-callback
@@ -53,9 +53,9 @@
                                    db/*db* (:user/id user) mid)
               tx-data (into [] #(vector :db/retractEntity (first %)) eids-to-retract)]
           (db/transact tx-data)
-          (tt/event! ::callbacks-delete {:user user
-                                         :message-id mid
-                                         :tx-data tx-data}))))
+          (tt/event! ::callbacks-delete {:data {:user user
+                                                :message-id mid
+                                                :tx-data tx-data}}))))
 
 
 (malli/=> set-new-message-ids [:=> [:cat spec/User [:or :int :nil] [:vector :uuid]] spec/MissionaryTask])
@@ -77,7 +77,7 @@
                           (into (map #(array-map :callback/uuid % :callback/message-id mid) uuids)))]
           (db/transact tx-data)
           (tt/event! ::callbacks-set-new-message-ids
-                     {:user user
-                      :message-id mid
-                      :unspoil-callback-uuids uuids
-                      :tx-data tx-data}))))
+                     {:data {:user user
+                             :message-id mid
+                             :unspoil-callback-uuids uuids
+                             :tx-data tx-data}}))))

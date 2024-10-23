@@ -2,11 +2,14 @@
   (:require
     [cheshire.core :as json]
     [cheshire.generate :as gen]
-    [clojure.walk :refer [postwalk]]
+    [clojure.string :as str]
+    [clojure.walk :refer [prewalk]]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.state :as s]
+    [malli.core :as malli]
     [me.raynes.fs :as fs]
-    [taoensso.telemere :as tt]))
+    [taoensso.telemere :as tt]
+    [taoensso.telemere.utils :as ttu]))
 
 
 (gen/add-encoder Object
@@ -22,40 +25,76 @@
   (reset! nano-timer (System/nanoTime)))
 
 
+(def console-event-id-handler
+  (tt/handler:console
+    {:output-fn
+     (tt/pr-signal-fn {:pr-fn (ttu/format-signal-fn
+                                {:incl-newline? false
+                                 :content-fn (constantly nil)})})}))
+
+
 (def console-json-handler
   (tt/handler:console {:output-fn (tt/pr-signal-fn {:pr-fn json/generate-string})}))
 
 
-(def file-json-disposable-handler
-  (do
-    (fs/delete "./logs/log.json")
-    (tt/handler:file {:output-fn (tt/pr-signal-fn {:pr-fn json/encode})
-                      :path "./logs.json"})))
+(defn- file-json-disposable-handler
+  []
+  (fs/delete "./logs.json")
+  (tt/handler:file {:output-fn (tt/pr-signal-fn {:pr-fn json/encode})
+                    :path "./logs.json"}))
 
 
-(def file-edn-disposable-handler
-  (do
-    (fs/delete "./log.edn")
-    (tt/handler:file {:output-fn (tt/pr-signal-fn {:pr-fn :edn})
-                      :path "./logs.edn"})))
+(defn- file-edn-disposable-handler
+  []
+  (fs/delete "./logs.edn")
+  (tt/handler:file {:output-fn (tt/pr-signal-fn {:pr-fn :edn})
+                    :path "./logs.edn"}))
+
+
+(defn- throwable->map
+  [t]
+  {:error {:message    (.getMessage t)
+           :type       (-> t .getClass .getName)
+           :data       (ex-data t)
+           :stackTrace (mapv str (.getStackTrace t))}})
+
+
+(defn- transform-malli-scheme
+  [sch]
+  (let [form (malli/form sch)]
+    (if (-> form str count (> 10000))
+      "<BIG MALLI SCHEME>"
+      form)))
+
+
+(defn- walk
+  [obj]
+  (cond-> obj
+    (instance? Throwable obj) throwable->map
+
+    (or (instance? clojure.lang.Var obj)
+        (instance? java.util.regex.Pattern obj)) str
+
+    (malli/schema? obj) transform-malli-scheme))
 
 
 (defn init-logging!
   [project-info profile]
+  (tt/remove-handler! :default/console)
   (when (= :aws profile)
     (tt/add-handler! :console-json console-json-handler))
   (when (= :test profile)
-    (tt/add-handler! :file-json-disposable file-json-disposable-handler)
-    (tt/add-handler! :file-edn-disposable file-edn-disposable-handler))
+    (tt/add-handler! :console-event-id console-event-id-handler)
+    (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
+    (tt/add-handler! :file-edn-disposable (file-edn-disposable-handler)))
   (tt/set-ctx! {:project project-info :profile profile})
   (tt/set-middleware! (fn [signal]
-                        (let [signal' (postwalk #(if (or (instance? clojure.lang.Var %)
-                                                         (instance? java.util.regex.Pattern %)) (str %) %) signal)
+                        (let [signal' (prewalk walk signal)
                               nt @nano-timer]
                           (cond-> signal'
                             (some? nt) (assoc :millis-passed
                                               (-> (System/nanoTime) (- nt) (* 0.000001)))))))
-  (tt/event! ::logging-initialized {:handlers (tt/get-handlers)}))
+  (tt/event! ::logging-initialized {:data {:handlers (tt/get-handlers)}}))
 
 
 (init-logging! (s/project-info) @conf/profile)

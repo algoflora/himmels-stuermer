@@ -50,7 +50,7 @@
 
 (def bot-default-language-code
   (m/sp (let [code (:bot/default-language-code (m/? conf/config))]
-          (tt/event! ::init-bot-default-language-code {:language-code code})
+          (tt/event! ::init-bot-default-language {:language-code code})
           {:bot/default-language-code code})))
 
 

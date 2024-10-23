@@ -64,7 +64,7 @@
 ;;              {:user user :msg-id msg-id}))
 
 
-(malli/=> load-to-state [:=> [:cat spec/State spec.tg/User] spec/MissionaryTask])
+(malli/=> load-to-state [:=> [:cat spec/State spec.tg/User [:? [:maybe :uuid]]] spec/MissionaryTask])
 
 
 (defn load-to-state
@@ -93,7 +93,7 @@
                                   :else [user? []])
                function         (requiring-resolve (or (:callback/function callback?) (-> state :handlers :main)))
                arguments        (assoc (or (:callback/arguments callback?) {}) :message (:message state))
-               task             (apply function (if (sequential? arguments) arguments [arguments]))]
+               task             (m/sp (m/? (apply function (if (sequential? arguments) arguments [arguments]))))]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
                                     (and (not= (-> state :handlers :main) (:callback/function user-callback?))

@@ -1,6 +1,7 @@
 (ns himmelsstuermer.core.state
   (:require
-    [clojure.pprint :refer [pprint]]
+    [clojure.data :as data]
+    [clojure.string :as str]
     [datalevin.core :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.init :as init]
@@ -57,14 +58,18 @@
   (m/sp (let [profile @conf/profile]
           (when (System/getProperty  "himmelsstuermer.malli.instrument" "false")
             (tt/event! ::malli-instrument-run)
-            (instrument! {:report (fn [type data]
-                                    (let [[s v] (case type
-                                                  :malli.core/invalid-input  [(:input data)  (:args data)]
-                                                  :malli.core/invalid-output [(:output data) (:value data)]
-                                                  nil)]
-                                      (tt/error! (malli/-exception
-                                                   type
-                                                   (merge (if (some? s) (malli/explain s v) {}) data)))))}))
+            (instrument! {:report
+                          (fn [type data]
+                            (let [[s v] (case type
+                                          :malli.core/invalid-input  [(:input data)  (:args data)]
+                                          :malli.core/invalid-output [(:output data) (:value data)]
+                                          nil)
+                                  explanation (when (malli/schema? s)
+                                                (malli/explain s v))
+                                  data'     (assoc data :explain explanation)
+                                  exception (malli/-exception type data')]
+                              (throw (tt/error! {:id type
+                                                 :data data'} exception))))}))
           (let [state (m/? (m/join (partial create-state profile)
                                    init/api-fn
                                    init/db-conn
@@ -79,31 +84,40 @@
             state))))
 
 
-(malli/=> modify-state [:-> spec/State spec/State])
+(defn- caller-map-fn
+  [^java.lang.StackTraceElement element]
+  (let [namespace (-> element .getClassName (str/split #"\$") first)
+        file-name (.getFileName element)
+        line      (.getLineNumber element)]
+    (when (and (str/starts-with? namespace "himmelsstuermer")
+               (not= "himmelsstuermer.core.state" namespace))
+      {:namespace namespace
+       :file-name file-name
+       :line line})))
+
+
+(malli/=> modify-state [:=> [:cat spec/State fn?] spec/State])
 
 
 (defn modify-state
   [state modify-fn]
-  (let [state' (modify-fn state)]
+  (let [stack-trace     (Thread/currentThread)
+        trace           (.getStackTrace stack-trace)
+        caller          (->> trace (map caller-map-fn) (filter some?) first)
+        state'          (modify-fn state)
+        [removed added] (data/diff state state')]
     (tt/set-ctx! (assoc tt/*ctx* :state state'))
-    (tt/event! ::state-modified {:data {:old-state state
-                                        :new-state state'}})
+    (tt/event! ::state-modified
+               {:data {:removed removed
+                       :added added
+                       :caller-info caller}})
     state'))
+
+
+(malli/=> shutdown! [:-> spec/State :any])
 
 
 (defn shutdown!
   [state]
   (d/close (-> state :system :db-conn))
   (tt/stop-handlers!))
-
-
-(comment
-  (def x (atom 0))
-  (def ^:dynamic *x* nil)
-
-  (binding [*x* x]
-    (swap! *x* inc))
-
-  @x
-
-  )

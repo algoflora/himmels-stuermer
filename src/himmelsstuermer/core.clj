@@ -29,7 +29,9 @@
         (let [state' (m/? (u/load-to-state state (:from message)))]
           (s/modify-state state' #(update
                                     % :tasks
-                                    conj (api/delete-message (:user state') (:message_id message)))))))
+                                    conj (m/sp
+                                           (m/?
+                                             (api/delete-message (:user state') (:message_id message)))))))))
 
 
 (defmethod handle-update- :callback-query
@@ -98,23 +100,20 @@
                         (malli/validate spec/ActionRequest body)
                         (m/? (handle-action (s/modify-state state' #(assoc % :action (:action body))))))
               tx-data (atom (:transaction state''))]
-          (tt/event! ::executing-business-logic)
+          (tt/event! ::executing-business-logic {})
           (binding [himmelsstuermer.api.db/*db*        (:database state'')
                     himmelsstuermer.api.vars/*user*    (:user state'')
                     himmelsstuermer.api.vars/*msg*     (some-> state'' :callback_query :message :message_id)
                     himmelsstuermer.api.vars/*config*  (some-> state'' :project :config)
                     himmelsstuermer.impl.db/*tx*       tx-data
                     himmelsstuermer.impl.state/*state* state'']
-            (bound-fn []
-              (tt/event! ::running-tasks)
-              (m/? (apply m/join (constantly nil) (:tasks state'')))))
+            ((bound-fn []
+               (tt/event! ::running-tasks {:data {:tasks (:tasks state'')}})
+               (m/? (apply m/join (constantly nil) (:tasks state''))))))
           ;; TODO: Research situation when message sent, button clicked but transaction still not complete
           (tt/event! ::transact-data {:tx-data @tx-data
                                       :tx-report (d/transact! (-> state'' :system :db-conn) @tx-data)})
           (tt/set-ctx! nil))))
-
-
-(malli/=> shutdown! [:-> spec/State :any])
 
 
 (def runtime-api-url (str "http://" (System/getenv "AWS_LAMBDA_RUNTIME_API") "/2018-06-01/runtime/"))
@@ -140,8 +139,8 @@
   (m/ap (let [initial-state (m/? s/state)]
           (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
           (try (let [{:keys [body
-                             headers] :as inv} (m/?> invocations)
-                     _ (tt/event! ::invocation-is-here {:data {:body body :headers headers :invocation inv}})
+                             headers]} (m/?> invocations)
+                     _ (tt/event! ::invocation-received {:data {:body body :headers headers}})
                      id                (get headers "lambda-runtime-aws-request-id")
                      state             (s/modify-state initial-state #(assoc % :aws-context headers))]
 
@@ -156,7 +155,9 @@
                                  {:body "OK"})
 
                       (catch Exception ex
-                        (tt/error! ::unhandled-exception ex)
+                        (tt/error! {:id ::unhandled-exception
+                                    :data ex}
+                                   ex)
                         (http/post (str runtime-api-url "invocation/" id "/error")
                                    {:body (json/encode (throwable->error-body ex))}))))
                (finally (s/shutdown! initial-state))))))
@@ -165,31 +166,3 @@
 (defn -main
   [& _]
   (m/? (m/reduce conj app)))
-
-
-;; (comment
-;;   (require '[datalevin.core :as d]
-;;            '[me.raynes.fs :as fs])
-
-;;   (let [dir (str (fs/temp-dir ""))
-;;         cn  (d/get-conn dir)]
-
-;;     (d/transact! cn [[:db/add -1 :a/id 1]
-;;                      [:db/add -2 :a/id 2]
-;;                      [:db/add -3 :a/id 3]])
-
-;;     (d/q '[:find ?a
-;;            :in $ ?ids
-;;            :where
-;;            [?a :a/id ?id]
-;;            (not-join [?id]
-;;                      [(contains? ?ids ?id)])] (d/db cn) #{1  3}))
-
-
-;;   (require '[missionary.core :as m])
-
-;;   (def fl (m/seed [1 2 3 4 5]))
-
-;;   (m/? (m/reduce conj (m/zip inc fl)))
-
-;;   )

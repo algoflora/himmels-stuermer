@@ -18,7 +18,7 @@
 (def Buttons
   [:vector
    [:maybe [:vector
-            [:maybe [:fn #(instance? b/KeyboardButton %)]]]]])
+            [:maybe [:fn #(satisfies? b/KeyboardButton %)]]]]])
 
 
 (def Record

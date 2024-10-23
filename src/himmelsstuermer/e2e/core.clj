@@ -15,8 +15,8 @@
 (defn request
   [method body]
   (tt/event! ::e2e-request-received
-             {:method method
-              :body body})
+             {:data {:method method
+                     :body body}})
   (serve method body))
 
 

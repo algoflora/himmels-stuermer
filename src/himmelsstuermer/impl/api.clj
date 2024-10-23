@@ -27,10 +27,10 @@
         resp (update result :body #(try (parse-string % true)
                                         (catch Throwable _ %)))]
     (tt/event! ::telegram-api-response
-               {:method method
-                :data data
-                :response resp
-                :time-millis (* 0.000001 nanos)})
+               {:data {:method method
+                       :data data
+                       :response resp
+                       :time-millis (* 0.000001 nanos)}})
     (if (-> resp :body :ok)
       (-> resp :body :result)
       (tt/error! ::bad-telegram-api-response (ex-info "Bad Telegram API response!"
@@ -41,12 +41,12 @@
 
 (defn api-task
   [method data]
-  (m/via m/blk (let [api-fn (-> *state* :system :api-fn)]
-                 (tt/event! ::calling-api-fn
-                            {:funtion (str api-fn)
+  (m/sp (let [api-fn (-> *state* :system :api-fn)]
+          (tt/event! ::calling-api-fn
+                     {:data {:function api-fn
                              :method method
-                             :data data})
-                 (api-fn method data))))
+                             :data data}})
+          (m/? (m/via m/blk (api-fn method data))))))
 
 
 (malli/=> prepare-keyboard [:=>
@@ -204,8 +204,8 @@
                             :args body
                             :error ex})))
          (tt/event! ::edit-message-failed
-                    {:request body
-                     :error ex})
+                    {:data {:request body
+                            :error ex}})
          (-send-message body))))
 
 
@@ -214,9 +214,9 @@
   (m/sp (let [body       (prepare-body b options user)
               new-msg    (m/? ((if (to-edit? options user) -edit-message-text -send-message) body))
               new-msg-id (:message_id new-msg)]
-          (tt/event! ::text-sent-to-chat {:user user
-                                          :body body
-                                          :new-message-id new-msg-id})
+          (tt/event! ::text-sent-to-chat {:data {:user user
+                                                 :body body
+                                                 :new-message-id new-msg-id}})
           (when (and (not (:temp options)) (not= new-msg-id (:msg-id user)))
             (db/transact [[:db/add [:user/uuid (:user/uuid user)] :user/msg-id new-msg-id]]))
           (m/? (set-callbacks-message-id user new-msg))
