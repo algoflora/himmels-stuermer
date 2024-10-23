@@ -52,7 +52,7 @@
 
 
 (defn- throwable->map
-  [t]
+  [^Throwable t]
   {:error {:message    (.getMessage t)
            :type       (-> t .getClass .getName)
            :data       (ex-data t)

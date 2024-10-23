@@ -110,8 +110,7 @@
                                    (is (= exp (set entities))))
         (some? caption_entities) (testing ">>> Checking caption entities...\n\n"
                                    (is (= exp (set caption_entities))))
-        (empty? exp)             (is true)
-        :else (is false "No entities or caption_entities!")))
+        (not-empty exp) (is false "No entities or caption_entities!")))
 
 
 (malli/=> check-msg [:=> [:cat spec.tg/User spec.bp/CheckMessageBlueprintEntryArgs] :nil])
