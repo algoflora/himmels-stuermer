@@ -26,7 +26,9 @@
 
 (def db-conn
   (m/sp (let [conn-str (or (:db/conn (m/? conf/config))
-                           (format "/tmp/himmelsstuermer-test/%s" (str (java.util.UUID/randomUUID))))
+                           (format "/tmp/himmelsstuermer-test/%s"
+                                   (System/getProperty "himmelsstuermer.test.connection-suffix"
+                                                       (str (java.util.UUID/randomUUID)))))
               opts     {:validate-data? true
                         :closed-schema? true
                         :auto-entity-time? false}
@@ -77,7 +79,7 @@
               roles (into {}
                           (map (fn [[k _]] [k (load-role roles-data (list k))]))
                           roles-data)]
-          (tt/event! ::init-bot-toles {:data {:roles roles}})
+          (tt/event! ::init-bot-roles {:data {:roles roles}})
           {:bot/roles roles})))
 
 

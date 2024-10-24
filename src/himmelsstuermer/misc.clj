@@ -12,6 +12,18 @@
   (println "DBG\t" x) x)
 
 
+(defmacro project-info
+
+  "This macro expands in map with keys `group`, `name` and `version` of current project by information from project.clj"
+
+  []
+  (let [[_ ga version] (read-string (try (slurp "project.clj") (catch Exception _ "[]")))
+        [ns name version] (try [(namespace ga) (name ga) version] (catch Exception _ []))]
+    {:group ns
+     :name name
+     :version version}))
+
+
 (defn- read-resource
   [resource-url]
   (with-open [stream (io/input-stream resource-url)]

@@ -2,26 +2,14 @@
   (:require
     [clojure.data :as data]
     [clojure.string :as str]
-    [datalevin.core :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.init :as init]
+    [himmelsstuermer.misc :as misc]
     [himmelsstuermer.spec :as spec]
     [malli.core :as malli]
     [malli.instrument :refer [instrument!]]
     [missionary.core :as m]
     [taoensso.telemere :as tt]))
-
-
-(defmacro project-info
-
-  "This macro expands in map with keys `group`, `name` and `version` of current project by information from project.clj"
-
-  []
-  (let [[_ ga version] (read-string (try (slurp "project.clj") (catch Exception _ "[]")))
-        [ns name version] (try [(namespace ga) (name ga) version] (catch Exception _ []))]
-    {:group ns
-     :name name
-     :version version}))
 
 
 (malli/=> create-state [:=> [:cat :keyword [:* :map]] spec/State])
@@ -39,7 +27,7 @@
      :actions {:namespace (:actions/namespace data)}
      :handlers {:main (:handler/main data)
                 :payment (:handler/payment data)}
-     :project (assoc (project-info)
+     :project (assoc (misc/project-info)
                      :config
                      (:project/config data))
      :database nil
@@ -119,4 +107,4 @@
 
 (defn shutdown!
   [state]
-  (d/close (-> state :system :db-conn)))
+  #_(d/close (-> state :system :db-conn)))

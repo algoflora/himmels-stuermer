@@ -27,5 +27,5 @@
 (defn handler
   [_]
   (m/join (constantly nil)
-          (h/delete-this-message nil)
-          ((requiring-resolve (-> *state* :handlers :main)) nil)))
+          (h/delete-this-message {})
+          ((requiring-resolve (-> *state* :handlers :main)) {})))

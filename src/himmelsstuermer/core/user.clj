@@ -51,7 +51,7 @@
            {:callback/uuid uuid
             :callback/function handler-main
             :callback/arguments {}
-            :callback/user {:db/id -1}
+            :callback/user -1
             :callback/service? false}]]))
 
 
@@ -82,6 +82,14 @@
 
                [user? user-callback? callback?]
                (first (d/q query database (:id from) uuid))
+
+               data (d/q query database (:id from) uuid)
+               datoms (mapv str (d/datoms database :eav))
+               id (:id from)
+               _ (tt/event! ::query-test {:data {:?uid id
+                                                 :?uuid uuid
+                                                 :datoms datoms
+                                                 :result data}})
 
                [user tx-data]   (cond
                                   (nil? user?)

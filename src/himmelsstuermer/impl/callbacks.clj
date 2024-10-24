@@ -2,6 +2,7 @@
   (:require
     [datalevin.core :as d]
     [himmelsstuermer.api.db :as db]
+    [himmelsstuermer.impl.state :refer [*state*]]
     [himmelsstuermer.spec :as spec]
     [malli.core :as malli]
     [missionary.core :as m]
@@ -45,12 +46,14 @@
 
 (defn delete
   [user mid]
+  (tt/event! ::clb-delete {:data {:user user :mid mid}})
   (m/sp (let [eids-to-retract (d/q '[:find ?cb
                                      :in $ ?uid ?mid
                                      :where
                                      [?cb :callback/message-id ?mid]
                                      [?cb :callback/user [:user/id ?uid]]]
                                    db/*db* (:user/id user) mid)
+              _ (tt/event! ::eids-to-retract {:data {:eids eids-to-retract}})
               tx-data (into [] #(vector :db/retractEntity (first %)) eids-to-retract)]
           (db/transact tx-data)
           (tt/event! ::callbacks-delete {:data {:user user
@@ -64,14 +67,14 @@
 (defn set-new-message-ids
   [user mid uuids]
   (m/sp (let [uuids-to-retract (d/q '[:find [?uuid ...]
-                                      :in $ ?uid ?mid ?uuids
+                                      :in $ ?ueid ?mid ?uuids
                                       :where
-                                      [?cb :callback/user [:user/id ?uid]]
+                                      [?cb :callback/user ?ueid]
                                       [?cb :callback/message-id ?mid]
                                       [?cb :callback/uuid ?uuid]
                                       (not-join [?uuid]
                                                 [(contains? ?uuids ?uuid)])]
-                                    db/*db* (:user/id user) mid (set uuids))
+                                    db/*db* (:db/id user) mid (set uuids))
               tx-data (-> []
                           (into (map #(vector :db/retractEntity [:callback/uuid %]) uuids-to-retract))
                           (into (map #(array-map :callback/uuid % :callback/message-id mid) uuids)))]

@@ -41,12 +41,13 @@
 
 (defn api-task
   [method data]
-  (m/sp (let [api-fn (-> *state* :system :api-fn)]
-          (tt/event! ::calling-api-fn
-                     {:data {:function api-fn
-                             :method method
-                             :data data}})
-          (m/? (m/via m/blk (api-fn method data))))))
+  (let [api-fn (-> *state* :system :api-fn)]
+    (tt/event! ::calling-api-fn
+               {:data {:function api-fn
+                       :method method
+                       :data data}})
+    #_(m/via m/blk (api-fn method data)) ; TODO: Trade-off for now to make things work
+    (m/sp (api-fn method data))))
 
 
 (malli/=> prepare-keyboard [:=>
@@ -183,46 +184,48 @@
     (set-callbacks-message-id user new-msg)))
 
 
-(malli/=> -send-message [:-> :map spec/MissionaryTask])
+(malli/=> send-message- [:-> :map spec/MissionaryTask])
 
 
-(defn- -send-message
-  [request-data]
-  (api-task :sendMessage request-data))
-
-
-(malli/=> -edit-message-text [:-> :map spec/MissionaryTask])
-
-
-(defn- -edit-message-text
+(defn- send-message-
   [body]
-  (try (api-task :editMessageText body)
-       (catch clojure.lang.ExceptionInfo ex
-         (when (not= 400 (-> ex ex-data :status))
-           (throw (ex-info "Request to :editMessageText failed!"
-                           {:event ::edit-message-text-error
-                            :args body
-                            :error ex})))
-         (tt/event! ::edit-message-failed
-                    {:data {:request body
-                            :error ex}})
-         (-send-message body))))
+  (api-task :sendMessage body))
+
+
+(malli/=> edit-message-text- [:-> :map spec/MissionaryTask])
+
+
+(defn- edit-message-text-
+  [body]
+  (m/sp (try (m/? (api-task :editMessageText body))
+             (catch clojure.lang.ExceptionInfo ex
+               (when (not= 400 (-> ex ex-data :status))
+                 (throw (ex-info "Request to :editMessageText failed!"
+                                 {:event ::edit-message-text-error
+                                  :args body
+                                  :error ex})))
+               (tt/event! ::edit-message-failed
+                          {:data {:request body
+                                  :error ex}})
+               (m/? (send-message- body))))))
 
 
 (defmethod send-to-chat :text
   [_ user b options]
   (m/sp (let [body       (prepare-body b options user)
-              _ (tt/event! ::to-edit? {:let [toedit? (to-edit? options user)]
-                                       :data {:options options
-                                              :user user
-                                              :to-edit? toedit?}})
-              new-msg    (m/? ((if (to-edit? options user) -edit-message-text -send-message) body))
+              msg-task   (if (to-edit? options user)
+                           (edit-message-text- body)
+                           (send-message- body))
+              new-msg    (m/? msg-task)
               new-msg-id (:message_id new-msg)]
           (tt/event! ::text-sent-to-chat {:data {:user user
                                                  :body body
+                                                 :new-msg new-msg
                                                  :new-message-id new-msg-id}})
           (when (and (not (:temp options)) (not= new-msg-id (:msg-id user)))
-            (db/transact [[:db/add [:user/uuid (:user/uuid user)] :user/msg-id new-msg-id]]))
+            (tt/event! ::set-user-msg-id {:data {:message new-msg
+                                                 :message-id new-msg-id}})
+            (db/transact [[:db/add (:db/id user) :user/msg-id new-msg-id]]))
           (m/? (set-callbacks-message-id user new-msg))
           new-msg-id)))
 
@@ -276,7 +279,7 @@
 
 (defn get-file
   [file-id]
-  (m/via m/blk (let [file-path (api-task :getFile file-id)]
+  (m/via m/blk (let [file-path (m/? (api-task :getFile file-id))]
                  (if (fs/exists? file-path)
                    (fs/file file-path)
                    (download-file file-path)))))
@@ -284,9 +287,10 @@
 
 (defn delete-message
   [user mid]
-  (clb/delete user mid)
-  (api-task :deleteMessage {:chat_id (:user/id user)
-                            :message_id mid}))
+  (m/join (constantly nil)
+          (clb/delete user mid)
+          (api-task :deleteMessage {:chat_id (:user/id user)
+                                    :message_id mid})))
 
 
 (defn answer-pre-checkout-query

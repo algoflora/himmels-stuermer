@@ -4,7 +4,7 @@
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
     [himmelsstuermer.core.config :as conf]
-    [himmelsstuermer.core.state :as s]
+    [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
     [me.raynes.fs :as fs]
     [taoensso.telemere :as tt]
@@ -72,6 +72,8 @@
   (cond-> obj
     (instance? Throwable obj) throwable->map
 
+    ;; (instance? datalevin.db.DB obj) ((constantly "<DATALEVIN DB>"))
+
     (or (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str
 
@@ -104,4 +106,4 @@
   (tt/event! ::logging-initialized {:data {:handlers (tt/get-handlers)}}))
 
 
-(init-logging! (s/project-info) @conf/profile)
+(init-logging! (misc/project-info) @conf/profile)

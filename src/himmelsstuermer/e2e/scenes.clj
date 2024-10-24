@@ -4,10 +4,10 @@
     [clojure.pprint :refer [pprint]]
     [clojure.string :as str]
     [clojure.test :refer [is testing]]
-    [himmelsstuermer.core.init :refer [handler-main]]
     [himmelsstuermer.e2e.client :as cl]
     [himmelsstuermer.e2e.dummy :as dum]
     [himmelsstuermer.impl.errors :refer [handle-error]]
+    [himmelsstuermer.misc :as misc]
     [himmelsstuermer.spec :as spec]
     [himmelsstuermer.spec.blueprint :as spec.bp]
     [himmelsstuermer.spec.telegram :as spec.tg]
@@ -193,18 +193,19 @@
 ;; TODO: Find out what the hell!
 ;; (m/=> apply-blueprint [:-> spec.bp/Blueprint :nil])
 
+(require '[himmelsstuermer.misc :refer [dbg]])
+
 
 (defn- apply-blueprint
   ([blueprint] (apply-blueprint blueprint 1))
   ([blueprint line]
    (when (not-empty blueprint)
      (let [key   (-> blueprint first namespace keyword)
+           _ (println "KEY\t" key (misc/project-info))
            dummy (cond
                    (dum/exists? key) (-> key dum/get-by-key :dummy)
 
-                   (= (-> key name (str/split #"\.") first)
-                      (-> (m/? handler-main) :handler/main namespace (str/split #"\.") first))
-                   nil
+                   (str/starts-with? key (:name (misc/project-info))) nil
 
                    :else (-> key dum/new :dummy))
            symb  (-> blueprint first name)
@@ -344,7 +345,9 @@
                                      (keyword? %) [% (get-scene %)]
                                      (vector?  %) [:inline %])
                                   ~arg)]
+           (System/setProperty "himmelsstuermer.test.connection-suffix" (str (random-uuid)))
            (with-redefs [himmelsstuermer.core.init/handler-main
                          ~(if (some? h) `(fn [] (m/sp ~h)) `himmelsstuermer.core.init/handler-main)]
              (binding [*clock* ~'a-clock]
-               (situation ~'blueprints))))))))
+               (situation ~'blueprints)))
+           (System/clearProperty "himmelsstuermer.test.connection-suffix"))))))

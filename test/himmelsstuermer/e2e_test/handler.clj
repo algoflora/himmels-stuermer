@@ -6,9 +6,7 @@
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.api.db :refer [*db* transact]]
     [himmelsstuermer.api.vars :refer [*user*]]
-    [himmelsstuermer.user :as u]
-    [missionary.core :as m]
-    [taoensso.timbre :as log]))
+    [himmelsstuermer.user :as u]))
 
 
 (defn main
@@ -51,9 +49,7 @@
                             :where
                             [?e :test-entity/user [:user/id ?uid]]
                             [?e :test-entity/data ?n]] *db* (:user/id *user*)))]
-    (log/debug ::reveal-2 {})
-    (api/send-message *user* name [])
-    (log/debug ::reveal-3 {})))
+    (api/send-message *user* name [])))
 
 
 (defn roled
