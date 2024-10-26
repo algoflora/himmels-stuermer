@@ -31,7 +31,7 @@
           file-name (.getFileName element)
           line      (.getLineNumber element)]
       (when (and (str/starts-with? namespace "himmelsstuermer")
-                 (not= this-ns namespace))
+                 (not (str/starts-with? namespace this-ns)))
         {:namespace namespace
          :file-name file-name
          :line line}))))
@@ -48,19 +48,21 @@
 
 (defn- read-resource
   [resource-url]
-  (with-open [stream (io/input-stream resource-url)]
-    (-> stream
-        io/reader
-        java.io.PushbackReader. edn/read)))
+  (-> resource-url
+      slurp
+      read-string))
 
 
 (defn read-resource-dir
   ([dir] (read-resource-dir dir "edn"))
   ([dir ext]
-   (m/via m/blk (into []
-                      (comp (mapcat read-resource)
-                            (filter #(str/ends-with? % (str "." ext))))
-                      (some-> dir io/resource res/url-dir)))))
+   (m/sp (into []
+               (comp (filter #(str/ends-with? % (str "." ext)))
+                     (mapcat read-resource))
+               (some-> dir io/resource res/url-dir)))))
+
+
+(m/? (read-resource-dir "schema"))
 
 
 (defmulti remove-nils (fn [x]

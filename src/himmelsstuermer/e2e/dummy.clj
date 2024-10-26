@@ -103,7 +103,6 @@
 
 (defn get-first-message
   [dummy]
-  (println "DUMMIES\t" dummy @dummies)
   (-> dummy :username keyword ((deref dummies)) :messages first))
 
 
@@ -147,8 +146,9 @@
     (swap! dummies (fn [dms]
                      (update-in dms [(-> dummy :username keyword) :messages]
                                 conj message)))
-    (tt/event! ::added-message {:data {:message message
-                                       :dummy ((-> dummy :username keyword) @dummies)}})
+    (let [dummy ((-> dummy :username keyword) @dummies)]
+      (tt/event! ::added-message {:data {:message message
+                                         :dummy dummy}}))
     (first (get-last-messages dummy 1 nil))))
 
 
@@ -176,7 +176,7 @@
   (let [{:keys [dummy messages]} (get-by-chat-id (or (:chat_id req) (-> req :chat :id)))
         msg-idx (find-message-index messages (:message_id req))
         k (-> dummy :username keyword)
-        dummies# (swap! dummies
+        dummies' (swap! dummies
                         (fn [dms]
                           (update-in
                             dms [k :messages]
@@ -187,9 +187,10 @@
                                                   {:text (:text req)
                                                    :entities (:entities req)
                                                    :reply_markup (:reply_markup req)})))))))
-        message (get-in dummies# [k :messages msg-idx])]
+        message (get-in dummies' [k :messages msg-idx])
+        dummy' (k dummies')]
     (tt/event! ::updated-message-text {:data {:message message
-                                              :dummy (k dummies#)}})
+                                              :dummy dummy'}})
     message))
 
 
@@ -204,6 +205,7 @@
                      (update-in dms [k :messages]
                                 (fn [msgs]
                                   (into [] (filter #(not= message-id (:message_id %)) msgs))))))
-    (tt/event! ::deleted-message {:data {:mesage-id message-id
-                                         :dummy (k @dummies)}})
+    (let [dummy' (k @dummies)]
+      (tt/event! ::deleted-message {:data {:mesage-id message-id
+                                           :dummy dummy'}}))
     (empty? (filter #(= message-id (:message_id %)) (-> @dummies k :messages)))))

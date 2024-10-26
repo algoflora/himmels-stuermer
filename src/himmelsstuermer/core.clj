@@ -4,10 +4,11 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [datalevin.core :as d]
-    [himmelsstuermer.core.logging :refer [reset-nano-timer!]]
+    [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
     [himmelsstuermer.impl.api :as api]
+    [himmelsstuermer.impl.error :as err]
     [himmelsstuermer.impl.transactor :refer [get-txs]]
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
@@ -27,14 +28,15 @@
         (let [state' (m/? (u/load-to-state state (:from message)))]
           (s/modify-state state' #(update
                                     % :tasks
-                                    conj (api/delete-message (s/construct-user-state state')
-                                                             (:user state')
-                                                             (:message_id message)))))))
+                                    conj (m/via m/blk (m/?
+                                                        (api/delete-message (s/construct-user-state state')
+                                                                            (:user state')
+                                                                            (:message_id message)))))))))
 
 
 (defmethod handle-update- :callback-query
   [_ {:keys [callback-query] :as state}]
-  (tt/event! ::handle-callback-query {:callback-query callback-query})
+  (tt/event! ::handle-callback-query {:data {:callback-query callback-query}})
   (u/load-to-state state (:from callback-query) (-> callback-query
                                                     :data
                                                     java.util.UUID/fromString)))
@@ -42,10 +44,13 @@
 
 (defmethod handle-update- :pre-checkout-query ; TODO: Add comprehensive processing of pre-checkout-query
   [_ {:keys [pre-checkout-query] :as state}]
-  (m/sp (tt/event! ::handle-pre-checkout-query {:pre-checkout-query pre-checkout-query})
+  (m/sp (tt/event! ::handle-pre-checkout-query {:data {:pre-checkout-query pre-checkout-query}})
         (s/modify-state state #(update
                                  % :tasks
-                                 conj (api/answer-pre-checkout-query state (:id pre-checkout-query))))))
+                                 conj (m/via m/blk
+                                             (m/?
+                                               (api/answer-pre-checkout-query (s/construct-user-state state)
+                                                                              (:id pre-checkout-query))))))))
 
 
 (malli/=> hyphenize-kw [:-> [:fn #(and (keyword? %) (not (qualified-keyword? %)))] :keyword])
@@ -79,37 +84,97 @@
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
+(malli/=> load-database [:-> spec/State spec/State])
+
+
+(defn- load-database
+  [s]
+  (let [state (s/modify-state s #(assoc % :database (-> s :system :db-conn d/db)))
+        db    (:database state)]
+    (tt/event! ::loaded-database {:data {:database db}})
+    state))
+
+
+(malli/=> handle-record [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
+
+
+(defn- handle-record
+  [s record]
+  (m/sp (let [body  (-> record :body (json/decode keyword))
+              state (load-database s)]
+          (cond
+            (malli/validate spec.tg/Update body)
+            (m/? (handle-update (s/modify-state state #(assoc % :update body))))
+
+            (malli/validate spec/ActionRequest body)
+            (m/? (handle-action (s/modify-state state #(assoc % :action (:action body)))))))))
+
+
+(malli/=> combine-tasks [:-> spec/State [:set spec/MissionaryTask]])
+
+
+(defn- combine-tasks
+  [state]
+  (let [user-state (s/construct-user-state state)]
+    (cond-> (:tasks state)
+      (some? (:function state))
+      (conj (m/via m/blk (m/? ((:function state) user-state)))))))
+
+
+(malli/=> perform-tasks [:=> [:cat spec/State [:set spec/MissionaryTask]] spec/MissionaryTask])
+
+
+(defn- perform-tasks
+  [state tasks]
+  (m/sp (tt/event! ::performing-tasks {:data {:tasks tasks
+                                              :state state}})
+        (m/? (apply m/join
+                    (fn [& args]
+                      (into (:transaction state)
+                            (mapcat get-txs) args))
+                    tasks))))
+
+
+(malli/=> persist-data [:=> [:cat spec/State [:set [:or :map [:vector :any]]]] spec/MissionaryTask]) ; TODO: Transaction spec?
+
+
+(defn- persist-data
+  [state tx-set]
+  (m/via m/blk
+         (tt/event! ::persisting-data {:data {:tx-set tx-set}})
+         (d/transact! (-> state :system :db-conn) (seq tx-set))))
+
+
+(defn- execute-business-logic
+  ([state tasks] (execute-business-logic state tasks false))
+  ([state tasks fallback?]
+   (m/sp (if fallback?
+           (tt/event! ::executing-business-logic-fallback {:data {:tasks tasks}})
+           (tt/event! ::executing-business-logic {:data {:tasks tasks}}))
+         (try (let [tx-set    (m/? (perform-tasks state tasks))]
+                (:tx-data (m/? (persist-data state tx-set)))
+                (tt/event! ::execute-finished))
+              (catch Exception exc
+                (let [exc-map (throwable->map exc)]
+                  (if fallback?
+                    (throw (tt/error! {:id   ::fatal-error
+                                       :data exc-map} exc))
+                    (let [fallback-task (err/handle-error (s/construct-user-state state)
+                                                          exc)]
+                      (tt/error! {:id   ::business-logic-error
+                                  :data exc-map} exc)
+                      (m/? (execute-business-logic state #{fallback-task} true))))))))))
+
+
 (malli/=> handle [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
 (defn handle
   [state record]
   (m/sp (tt/event! ::handle-core {:data {:record record}}) ; TODO: check "private" chats, "/start" command, etc...
-        (let [state'  (s/modify-state state #(assoc % :database (-> state :system :db-conn d/db)))
-              _ (tt/event! ::loaded-database {:data {:database (-> state' :database)
-                                                     :conn (-> state' :system :db-conn)}})
-              body    (-> record :body (json/decode keyword))
-              state'' (cond
-                        (malli/validate spec.tg/Update body)
-                        (m/? (handle-update (s/modify-state state' #(assoc % :update body))))
-
-                        (malli/validate spec/ActionRequest body)
-                        (m/? (handle-action (s/modify-state state' #(assoc % :action (:action body))))))
-              user-state (s/construct-user-state state'')
-              tasks (conj (:tasks state'') ((:function state'') user-state))]
-          (tt/event! ::executing-business-logic {:tasks tasks
-                                                 :user-state user-state})
-          ;; TODO: Research situation when message sent, button clicked but transaction still not complete
-          (let [txd (m/? (apply m/join (fn [& args]
-                                         (into (:transaction state'')
-                                               (mapcat get-txs)
-                                               args))
-                                tasks))
-                _ (tt/event! ::transacting-data {:data {:tx-data txd}})
-                tx-data (into []
-                              (map (comp vec seq))
-                              (:tx-data (d/transact! (-> state'' :system :db-conn) (seq txd))))]
-            (tt/event! ::transacted-data {:data {:tx-data tx-data}})))))
+        (let [state (m/? (handle-record state record))
+              tasks (combine-tasks state)]
+          (m/? (execute-business-logic state tasks)))))
 
 
 (def runtime-api-url (str "http://" (System/getenv "AWS_LAMBDA_RUNTIME_API") "/2018-06-01/runtime/"))
@@ -154,74 +219,20 @@
                                          (tt/event! ::record-processed)
                                          (tt/set-ctx! (assoc tt/*ctx* :state state))))))
 
-                  (tt/event! ::invocation-response-ok {:invocation-id id})
+                  (tt/event! ::invocation-response-ok {:data {:invocation-id id}})
                   (http/post (str runtime-api-url "invocation/" id "/response")
                              {:body "OK"})
 
-                  (catch Exception ex
-                    (tt/error! {:id ::unhandled-exception
-                                :data ex}
-                               ex)
+                  (catch Exception exc
+                    (let [exc-map (throwable->map exc)]
+                      (tt/error! {:id   ::unhandled-exception
+                                  :data exc-map}
+                                 exc))
                     (http/post (str runtime-api-url "invocation/" id "/error")
-                               {:body (json/encode (throwable->error-body ex))}))))))
+                               {:body (json/encode (throwable->error-body exc))}))))))
     requests))
 
 
 (defn -main
   [& _]
   (m/? (m/reduce conj app)))
-
-
-(comment
-  (-main)
-
-  (def t (m/ap (let [x 10]
-                 (m/?> (m/seed [1 2 3 x])))))
-
-  (m/? (m/reduce conj t))
-
-  
-
-  (m/? (m/reduce conj (try (m/eduction (map #(/ 100 %)) (m/seed [1 2 3])) (catch Exception ex (println ex)))))
-  
-
-  (def fl (m/seed [:a 1 2 3 :b [1 2] :c :q repeat 3 [:x 1] :q :d 1 2 3]))
-
-  (defn construct-mapper
-    []
-    (let [counter (atom 0)]
-      (fn [i]
-        (when (keyword? i)
-          (swap! counter inc))
-        [@counter i])))
-  
-  (def f (m/eduction (map (construct-mapper))
-                     (partition-by first)
-                     (map #(map second %))
-                     (map (fn [els]
-                            (if (= :q (first els))
-                              (when (fn? (second els))
-                                (apply (second els) (drop 2 els)))
-                              [els])))
-                     cat fl))
-
-  (m/? (m/reduce conj f))
-
-
-
-  (do
-    (require '[me.raynes.fs :as fs]
-             '[datalevin.core :as d])
-
-    (let [tmp-dir (str (fs/temp-dir "dtlv-sandbox"))
-          cn (d/get-conn tmp-dir {:a/id  {:db/valueType :db.type/long}
-                                  :a/ref {:db/valueType :db.type/ref}
-                                  :b/id  {:db/valueType :db.type/keyword}})]
-      (try (d/transact cn [{:a/id 1
-                            :a/ref :zxc}
-                           {:db/id :zxc
-                            :b/id :A}])
-           (finally
-             (d/close cn)
-             (fs/delete-dir tmp-dir)))))
-  )

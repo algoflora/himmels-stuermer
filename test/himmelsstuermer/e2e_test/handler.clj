@@ -59,17 +59,17 @@
     (api/send-message state usr text [])))
 
 
-(defn error
+(defn fail
   [{:keys [usr] :as state}]
-  (api/send-message state usr "Hello World!" [[(b/text-btn "Button" 'himmelsstuermer.e2e-test.handler/error-button)]]))
+  (api/send-message state usr "Hello World!" [[(b/text-btn "Button" 'himmelsstuermer.e2e-test.handler/fail-button)]]))
 
 
-(defn error-button
+(defn fail-button
   [{:keys [usr] :as state}]
-  (api/send-message state usr "Click Error" [[(b/text-btn "Error" 'himmelsstuermer.e2e-test.handler/error-expression)]]))
+  (api/send-message state usr "Click Error" [[(b/text-btn "Error" 'himmelsstuermer.e2e-test.handler/fail-expression)]]))
 
 
-(defn error-expression
+(defn fail-expression
   [_]
   (/ 1 0))
 

@@ -211,6 +211,7 @@
 
 (def SendInvoiceRequest
   [:map {:closed true}
+   [:chat_id :int]
    [:title [:string {:min 1 :max 32}]]
    [:description [:string {:min 1 :max 255}]]
    [:payload [:string {:min 1 :max 128}]]

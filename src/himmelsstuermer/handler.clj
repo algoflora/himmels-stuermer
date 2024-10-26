@@ -24,8 +24,9 @@
 
   "Payments handler. Must be overriden in project if payments processing is necessary."
 
-  [{:keys [usr successful_payment] :as state}]
+  [{usr :usr {payment :successful_payment} :msg :as state}]
+  (println "PAYMENT")
   (api/send-message state usr
                     (str "Successful payment with payload "
-                         (:invoice_payload successful_payment))
+                         (:invoice_payload payment))
                     [] :temp))

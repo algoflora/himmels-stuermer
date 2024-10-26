@@ -158,14 +158,17 @@
                                (filter #(and (= dummy (:dummy %)) (:approved %)))
                                last)]
     (when (nil? invoice)
-      (throw (ex-info "No approved invoice!"
-                      {:event ::no-approved-invoice-error
-                       :dummy dummy
-                       :pre-checkout-queries @pre-checkout-queries})))
-    (send-update {:message (assoc (dummy->base-message dummy)
-                                  :successful_payment
-                                  {:currency (:currency invoice)
-                                   :total_amount (->> invoice :prices (map :amount) (apply +))
-                                   :invoice_payload (:payload invoice)
-                                   :telegram_payment_charge_id (str (random-uuid))
-                                   :provider_payment_charge_id (str (random-uuid))})})))
+      (let [pcqs @pre-checkout-queries]
+        (throw (tt/error! {:id ::no-approved-invoice-error
+                           :data {:dummy dummy
+                                  :pre-checkout-queries pcqs}}
+                          (ex-info "No approved invoice!" {})))))
+    (let [message (assoc (dummy->base-message dummy)
+                         :successful_payment
+                         {:currency (:currency invoice)
+                          :total_amount (->> invoice :prices (map :amount) (apply +))
+                          :invoice_payload (:payload invoice)
+                          :telegram_payment_charge_id (str (random-uuid))
+                          :provider_payment_charge_id (str (random-uuid))})]
+      (dum/add-message message)
+      (send-update {:message message}))))

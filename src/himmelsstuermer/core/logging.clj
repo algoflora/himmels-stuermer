@@ -103,7 +103,8 @@
                           (cond-> signal'
                             (some? nt) (assoc-in [:data :millis-passed]
                                                  (-> (System/nanoTime) (- nt) (* 0.000001)))))))
-  (tt/event! ::logging-initialized {:data {:handlers (tt/get-handlers)}}))
+  (let [handlers (tt/get-handlers)]
+    (tt/event! ::logging-initialized {:data {:handlers handlers}})))
 
 
 (init-logging! (misc/project-info) @conf/profile)

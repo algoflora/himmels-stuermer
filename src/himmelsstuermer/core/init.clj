@@ -90,11 +90,9 @@
 
 
 (def handler-payment
-  (m/sp (let [sym  (:handler/payment (m/? conf/config))
-              func (requiring-resolve sym)]
-          (tt/event! ::init-handler-payment {:data {:symbol sym
-                                                    :function func}})
-          {:handler/payment @func})))
+  (m/sp (let [sym  (:handler/payment (m/? conf/config))]
+          (tt/event! ::init-handler-payment {:data {:symbol sym}})
+          {:handler/payment sym})))
 
 
 (def actions-namespace

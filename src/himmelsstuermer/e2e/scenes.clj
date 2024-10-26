@@ -296,9 +296,10 @@
       (testing (str "Scene:\t" k "\n")
         (t/with-clock *clock*
                       (apply-blueprint bp))))
-    (catch Exception ex
-      (throw (tt/error! {:id ::situation-error
-                         :data (throwable->map ex)} ex)))
+    (catch Exception exc
+      (let [exc-map (throwable->map exc)]
+        (throw (tt/error! {:id ::situation-error
+                           :data exc-map} exc))))
     (finally
       (dum/clear-all))))
 
@@ -345,7 +346,11 @@
                               ~arg)]
            (System/setProperty "himmelsstuermer.test.connection-suffix" (str (random-uuid)))
            (with-redefs [himmelsstuermer.core.init/handler-main
-                         ~(if (some? h) `(fn [] (m/sp ~h)) `himmelsstuermer.core.init/handler-main)]
+                         ~(if (some? h)
+                            `(m/sp
+                               (tt/event! ::init-handler-main-mock {:data {:symbol ~h}})
+                               {:handler/main ~h})
+                            `himmelsstuermer.core.init/handler-main)]
              (binding [*clock* ~'a-clock]
                (situation ~'scenes)))
            (System/clearProperty "himmelsstuermer.test.connection-suffix"))))))

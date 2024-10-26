@@ -43,13 +43,13 @@
 
 (defn api-task
   [state method data]
-  (let [api-fn (:himmelsstuermer/api-fn state)
-        token  (-> state :bot :token)]
-    (tt/event! ::calling-api-fn
-               {:data {:function api-fn
-                       :method method
-                       :data data}})
-    (m/via m/blk (api-fn token method data))))
+  (m/sp (let [api-fn (:himmelsstuermer/api-fn state)
+              token  (-> state :bot :token)]
+          (tt/event! ::calling-api-fn
+                     {:data {:function api-fn
+                             :method method
+                             :data data}})
+          (api-fn token method data))))
 
 
 (malli/=> prepare-keyboard [:=>
@@ -183,9 +183,9 @@
 
 (defmethod send-to-chat :invoice
   [_ state user b options]
-  (let [body (prepare-body b options user)
-        new-msg (m/? (api-task state :sendInvoice body))]
-    (set-callbacks-message-id state user new-msg)))
+  (m/sp (let [body (prepare-body b options user)
+              new-msg (m/? (api-task state :sendInvoice body))]
+          (m/? (set-callbacks-message-id state user new-msg)))))
 
 
 (malli/=> send-message- [:=> [:cat spec/UserState :map] spec/MissionaryTask])
@@ -193,7 +193,7 @@
 
 (defn- send-message-
   [state body]
-  (api-task state :sendMessage body))
+  (m/sp (m/? (api-task state :sendMessage body))))
 
 
 (malli/=> edit-message-text- [:=> [:cat spec/UserState :map] spec/MissionaryTask])
@@ -265,7 +265,8 @@
 
 (defn send!
   [type state user & args]
-  (m/sp (let [{:keys [body options]} (apply process-args type state user args)]
+  (m/sp (let [{:keys [body options]} (apply process-args type state user args)
+              response (m/? (send-to-chat type state user body options))]
           (reify
             TransactionsStorage
 
@@ -274,7 +275,7 @@
 
             clojure.lang.IDeref
 
-            (deref [_] (m/? (send-to-chat type state user body options)))))))
+            (deref [_] response)))))
 
 
 (defn- download-file
@@ -310,7 +311,8 @@
 (defn answer-pre-checkout-query
   ([state pcq-id] (answer-pre-checkout-query state pcq-id nil))
   ([state pcq-id error]
-   (api-task state :answerPrecheckoutQuery (into {:pre_checkout_query_id pcq-id
-                                                  :ok (nil? error)}
-                                                 (when (some? error)
-                                                   [:error_message error])))))
+   (m/sp (m/? (api-task state :answerPrecheckoutQuery (into {:pre_checkout_query_id pcq-id
+                                                             :ok (nil? error)}
+                                                            (when (some? error)
+                                                              [:error_message error]))))
+         (:txs state))))

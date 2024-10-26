@@ -71,7 +71,7 @@
 
 (def state
   (m/sp (let [profile @conf/profile]
-          (when (Boolean/parseBoolean (System/getProperty  "himmelsstuermer.malli.instrument"))
+          (when (Boolean/parseBoolean (System/getProperty "himmelsstuermer.malli.instrument"))
             (tt/event! ::malli-instrument-run)
             (instrument! {:report
                           (fn [type data]

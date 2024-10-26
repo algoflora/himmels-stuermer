@@ -99,7 +99,12 @@
                                   (renew user? from)
 
                                   :else [user? []])
-               function         @(requiring-resolve (or (:callback/function callback?) (-> state :handlers :main)))
+               is-payment?      (contains? (:message state) :successful_payment)
+               function         @(requiring-resolve ; TODO: rewrite more elegant
+                                  (if is-payment?
+                                    (-> state :handlers :payment)
+                                    (or (:callback/function callback?)
+                                        (-> state :handlers :main))))
                arguments        (or (:callback/arguments callback?) {})]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
