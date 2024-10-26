@@ -34,24 +34,13 @@ RUN lein
 # Copy project
 
 COPY . /app
+WORKDIR /app
 
-# Build uberjar
+# Build uberjarNecessacy env vars
 
 ENV DTLV_COMPILE_NATIVE=true
 ENV USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM=false
-WORKDIR /app
-RUN lein uberjar
 
-# Build native image
+# Run build script
 
-RUN native-image \
-    # --features=InitAtBuildTimeFeature \
-    --initialize-at-build-time \
-    --no-fallback \
-    --verbose \
-    -jar target/uberjar/uberjar.jar \
-    -H:Name=lambda \
-    -H:+ReportExceptionStackTraces \
-    -H:Class=himmelsstuermer.core \
-    -H:ConfigurationFileDirectories=META-INF/native-image \
-    -J-Djdk.internal.vm.ci=disable
+CMD ./build.sh

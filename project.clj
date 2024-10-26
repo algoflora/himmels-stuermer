@@ -28,15 +28,17 @@
 
   :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
              "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
-  :profiles {:dev {:dependencies [[lambdaisland/kaocha "1.91.1392"]]
+  :profiles {:dev {:dependencies [[lambdaisland/kaocha "1.91.1392"
+                                   :exclusions [net.incongru.watchservice/barbary-watchservice]]]
                    :source-paths ["src"]
                    :resource-paths ["resources" "test/resources"]
                    :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
                               "-Dhimmelsstuermer.profile=test"
                               "--add-opens=java.base/java.nio=ALL-UNNAMED"
                               "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}
-             :uberjar {:aot [himmelsstuermer.core]
-                       :uberjar-name "himmelsstuermer.jar"
+             :uberjar {:dependencies [[org.clojars.huahaiy/datalevin-native "0.9.12"]]
+                       :aot [himmelsstuermer.core]
+                       :uberjar-name "uberjar.jar"
                        :uberjar-exclusions ["himmelsstuermer.aws.*"]
                        :env {:DTLV_COMPILE_NATIVE "true"
                              :USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM "false"}
