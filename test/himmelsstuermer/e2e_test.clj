@@ -79,13 +79,13 @@
    :user/check-and-close-only-temp "Successful payment with payload all-your-money"])
 
 
-;; (situation-run Core
-;;                [:users/main-message :users/temp-message])
+(situation-run Core
+               [:users/main-message :users/temp-message])
 
 
-(situation-run DB
-               'himmelsstuermer.e2e-test.handler/store
-               [:users/additional-entities])
+;; (situation-run DB
+;;                'himmelsstuermer.e2e-test.handler/store
+;;                [:users/additional-entities])
 
 
 ;; (situation-run Roles

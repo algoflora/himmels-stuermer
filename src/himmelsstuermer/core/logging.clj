@@ -51,7 +51,7 @@
                     :path "./logs.edn"}))
 
 
-(defn- throwable->map
+(defn throwable->map
   [^Throwable t]
   {:error {:message    (.getMessage t)
            :type       (-> t .getClass .getName)

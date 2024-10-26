@@ -4,68 +4,69 @@
     [datalevin.core :as d]
     [himmelsstuermer.api :as api]
     [himmelsstuermer.api.buttons :as b]
-    [himmelsstuermer.api.db :refer [*db* transact]]
-    [himmelsstuermer.api.vars :refer [*user*]]
+    [himmelsstuermer.api.transactor :refer [transact!]]
     [himmelsstuermer.user :as u]))
 
 
 (defn main
-  [{msg :message}]
+  [{:keys [msg usr] :as state}]
   (let [text (or (:text msg) "stranger")]
-    (api/send-message *user*
+    (api/send-message state usr
                       (format "Hi, %s!" text)
                       [[(b/text-btn "Go!" 'go {:text text})]
                        [(b/text-btn "Temp" 'temp)]])))
 
 
 (defn go
-  [{:keys [text]}]
-  (api/send-message *user* (format "Go, %s!" text) [[(b/home-btn "Home")]]))
+  [{:keys [text usr] :as state}]
+  (api/send-message state usr (format "Go, %s!" text) [[(b/home-btn "Home")]]))
 
 
 (defn temp
-  [_]
-  (api/send-message *user*
-                    (format "Temp message of %s" (-> *user* :user/first-name str/capitalize))
+  [{:keys [usr] :as state}]
+  (api/send-message state usr
+                    (format "Temp message of %s" (-> usr :user/first-name str/capitalize))
                     [] :temp))
 
 
 (defn store
-  [_]
-  (api/send-message *user* "Hello" [[(b/text-btn "Save" 'save)]]))
+  [{:keys [usr] :as state}]
+  (api/send-message state usr "Hello" [[(b/text-btn "Save" 'save)]]))
 
 
 (defn save
-  [_]
-  (transact [{:test-entity/user [:user/id (:user/id *user*)]
-              :test-entity/data (str/upper-case (:user/first-name *user*))}])
-  (api/send-message *user* "Name saved" [[(b/text-btn "Reveal" 'himmelsstuermer.e2e-test.handler/reveal)]]))
+  [{:keys [usr txs] :as state}]
+  (transact! txs [{:test-entity/user [:user/id (:user/id usr)]
+                   :test-entity/data (str/upper-case (:user/first-name usr))}])
+  (api/send-message state usr
+                    "Name saved"
+                    [[(b/text-btn "Reveal" 'himmelsstuermer.e2e-test.handler/reveal)]]))
 
 
 (defn reveal
-  [_]
+  [{:keys [usr idb] :as state}]
   (let [name (ffirst (d/q '[:find ?n
                             :in $ ?uid
                             :where
                             [?e :test-entity/user [:user/id ?uid]]
-                            [?e :test-entity/data ?n]] *db* (:user/id *user*)))]
-    (api/send-message *user* name [])))
+                            [?e :test-entity/data ?n]] idb (:user/id usr)))]
+    (api/send-message state usr name [])))
 
 
 (defn roled
-  [_]
-  (let [text (if (u/has-role? :admin) "Hello, sir" "Hi")]
-    (api/send-message *user* text [])))
+  [{:keys [usr] :as state}]
+  (let [text (if (u/has-role? state :admin) "Hello, sir" "Hi")]
+    (api/send-message state usr text [])))
 
 
 (defn error
-  [_]
-  (api/send-message *user* "Hello World!" [[(b/text-btn "Button" 'himmelsstuermer.e2e-test.handler/error-button)]]))
+  [{:keys [usr] :as state}]
+  (api/send-message state usr "Hello World!" [[(b/text-btn "Button" 'himmelsstuermer.e2e-test.handler/error-button)]]))
 
 
 (defn error-button
-  [_]
-  (api/send-message *user* "Click Error" [[(b/text-btn "Error" 'himmelsstuermer.e2e-test.handler/error-expression)]]))
+  [{:keys [usr] :as state}]
+  (api/send-message state usr "Click Error" [[(b/text-btn "Error" 'himmelsstuermer.e2e-test.handler/error-expression)]]))
 
 
 (defn error-expression
@@ -74,17 +75,17 @@
 
 
 (defn payment
-  [_]
-  (api/send-message *user* "Give me all your money!" [[(b/text-btn "Invoice" 'invoice)]]))
+  [{:keys [usr] :as state}]
+  (api/send-message state usr "Give me all your money!" [[(b/text-btn "Invoice" 'invoice)]]))
 
 
 (defn invoice
-  [_]
-  (api/send-invoice *user* {:title "Invoice"
-                            :description "All your money!"
-                            :payload "all-your-money"
-                            :provider_token "" ; Like XTR
-                            :currency "XTR"
-                            :prices [{:label "Price" :amount 15000}
-                                     {:label "Discount" :amount -5000}]}
+  [{:keys [usr] :as state}]
+  (api/send-invoice state usr {:title "Invoice"
+                               :description "All your money!"
+                               :payload "all-your-money"
+                               :provider_token "" ; Like XTR
+                               :currency "XTR"
+                               :prices [{:label "Price" :amount 15000}
+                                        {:label "Discount" :amount -5000}]}
                     "Pay 100 XTR" [[(b/text-btn "Dummy button" 'fake)]]))

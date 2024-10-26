@@ -4,18 +4,15 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [datalevin.core :as d]
-    [himmelsstuermer.api.db]
-    [himmelsstuermer.api.vars]
     [himmelsstuermer.core.logging :refer [reset-nano-timer!]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
     [himmelsstuermer.impl.api :as api]
-    [himmelsstuermer.impl.db]
-    [himmelsstuermer.impl.state]
-    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.impl.transactor :refer [get-txs]]
+    [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
-    ;; [hyperfiddle.rcf :refer [tests tap %]]
     [malli.core :as malli]
+    [me.raynes.fs :as fs]
     [missionary.core :as m]
     [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
@@ -30,19 +27,17 @@
         (let [state' (m/? (u/load-to-state state (:from message)))]
           (s/modify-state state' #(update
                                     % :tasks
-                                    conj (m/sp
-                                           (m/?
-                                             (api/delete-message (:user state') (:message_id message)))))))))
+                                    conj (api/delete-message (s/construct-user-state state')
+                                                             (:user state')
+                                                             (:message_id message)))))))
 
 
 (defmethod handle-update- :callback-query
   [_ {:keys [callback-query] :as state}]
-  (m/sp (tt/event! ::handle-callback-query {:callback-query callback-query})
-        (m/? (let [st (u/load-to-state state (:from callback-query) (-> callback-query
-                                                                        :data
-                                                                        java.util.UUID/fromString))]
-               (tt/event! ::test-state {:data {:st st}})
-               st))))
+  (tt/event! ::handle-callback-query {:callback-query callback-query})
+  (u/load-to-state state (:from callback-query) (-> callback-query
+                                                    :data
+                                                    java.util.UUID/fromString)))
 
 
 (defmethod handle-update- :pre-checkout-query ; TODO: Add comprehensive processing of pre-checkout-query
@@ -50,7 +45,7 @@
   (m/sp (tt/event! ::handle-pre-checkout-query {:pre-checkout-query pre-checkout-query})
         (s/modify-state state #(update
                                  % :tasks
-                                 conj (api/answer-pre-checkout-query (:id pre-checkout-query))))))
+                                 conj (api/answer-pre-checkout-query state (:id pre-checkout-query))))))
 
 
 (malli/=> hyphenize-kw [:-> [:fn #(and (keyword? %) (not (qualified-keyword? %)))] :keyword])
@@ -79,11 +74,9 @@
 (defn- handle-action
   [{:keys [action] :as state}]
   (m/sp (tt/event! ::handle-action {:data {:action action}})
-        (let [args (:arguments action)
-              task (apply
-                     (requiring-resolve (symbol (-> state :actions :namespace str) (:method action)))
-                     (if (sequential? args) args [args]))]
-          (s/modify-state state #(update % :tasks conj task)))))
+        (let [arguments (:arguments action)
+              function  (requiring-resolve (symbol (-> state :actions :namespace str) (:method action)))]
+          (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
 (malli/=> handle [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
@@ -102,24 +95,21 @@
 
                         (malli/validate spec/ActionRequest body)
                         (m/? (handle-action (s/modify-state state' #(assoc % :action (:action body))))))
-              tx-data (atom (:transaction state''))]
-          (tt/event! ::executing-business-logic {})
-          (binding [himmelsstuermer.api.db/*db*        (:database state'')
-                    himmelsstuermer.api.vars/*user*    (:user state'')
-                    himmelsstuermer.api.vars/*msg*     (some-> state'' :callback-query :message :message_id)
-                    himmelsstuermer.api.vars/*config*  (some-> state'' :project :config)
-                    himmelsstuermer.impl.db/*tx*       tx-data
-                    himmelsstuermer.impl.state/*state* state'']
-            (tt/event! ::running-tasks {:data {:tasks (:tasks state'')}})
-            (let [report ((bound-fn [] (m/? (apply m/join vector (:tasks state'')))))]
-              (tt/event! ::report-tasks {:data {:report report}})))
+              user-state (s/construct-user-state state'')
+              tasks (conj (:tasks state'') ((:function state'') user-state))]
+          (tt/event! ::executing-business-logic {:tasks tasks
+                                                 :user-state user-state})
           ;; TODO: Research situation when message sent, button clicked but transaction still not complete
-          (let [txd (vec @tx-data)
+          (let [txd (m/? (apply m/join (fn [& args]
+                                         (into (:transaction state'')
+                                               (mapcat get-txs)
+                                               args))
+                                tasks))
                 _ (tt/event! ::transacting-data {:data {:tx-data txd}})
-                tx-data' (into []
-                               (map (comp vec seq))
-                               (:tx-data (d/transact! (-> state'' :system :db-conn) (vec @tx-data))))]
-            (tt/event! ::transacted-data {:data {:tx-data tx-data'}})))))
+                tx-data (into []
+                              (map (comp vec seq))
+                              (:tx-data (d/transact! (-> state'' :system :db-conn) (seq txd))))]
+            (tt/event! ::transacted-data {:data {:tx-data tx-data}})))))
 
 
 (def runtime-api-url (str "http://" (System/getenv "AWS_LAMBDA_RUNTIME_API") "/2018-06-01/runtime/"))
@@ -137,21 +127,20 @@
 
 
 (def invocations
-  (m/seed (repeatedly @(http/get (str runtime-api-url "invocation/next")
-                                 {:timeout timeout-ms}))))
-
-
-(def invocations (m/seed [1]))
+  (m/seed (repeatedly (fn []
+                        @(http/get (str runtime-api-url "invocation/next")
+                                   {:timeout timeout-ms})))))
 
 
 (def requests
-  (let [initial-state (m/? s/state)]
-    (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
-    (try (m/eduction (map (fn [{:keys [body headers]}]
-                            {:state   (s/modify-state initial-state #(assoc % :aws-context headers))
-                             :records (:Records (json/decode body keyword))}))
-                     invocations)
-         (finally (s/shutdown! initial-state)))))
+  (m/ap (let [initial-state (m/? s/state)]
+          (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
+          (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
+                                        {:state   (s/modify-state initial-state
+                                                                  #(assoc % :aws-context headers))
+                                         :records (:Records (json/decode body keyword))}))
+                                 invocations))
+               (finally (s/shutdown! initial-state))))))
 
 
 (def app
@@ -159,9 +148,11 @@
     (map (fn [{:keys [state records]}]
            (let [id (get-in state [:aws-context "lambda-runtime-aws-request-id"])]
              (try (m/? (m/reduce (constantly :processed)
-                                 (m/ap (let [record (m/?> records)]
+                                 (m/ap (let [record (m/?> (m/seed records))]
                                          (reset-nano-timer!)
-                                         (handle state record)))))
+                                         (m/? (handle state record))
+                                         (tt/event! ::record-processed)
+                                         (tt/set-ctx! (assoc tt/*ctx* :state state))))))
 
                   (tt/event! ::invocation-response-ok {:invocation-id id})
                   (http/post (str runtime-api-url "invocation/" id "/response")
@@ -176,60 +167,61 @@
     requests))
 
 
-;; (def app
-;;   (m/ap (let [initial-state (m/? s/state)]
-;;           (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
-;;           (try (let [{:keys [body
-;;                              headers]} (m/?> invocations)
-;;                      _ (tt/event! ::invocation-received {:data {:body body :headers headers}})
-;;                      id                (get headers "lambda-runtime-aws-request-id")
-;;                      state             (s/modify-state initial-state #(assoc % :aws-context headers))]
-
-;;                  (try (m/?
-;;                         (m/reduce conj
-;;                                   (m/ap
-;;                                     (let [record (m/?> (m/seed (:Records body)))]
-;;                                       (reset-nano-timer!)
-;;                                       (m/? (handle state record))
-;;                                       (tt/set-ctx! nil)))))
-;;                       (tt/event! ::invocation-response-ok {:invocation-id id})
-;;                       (http/post (str runtime-api-url "invocation/" id "/response")
-;;                                  {:body "OK"})
-
-;;                       (catch Exception ex
-;;                         (tt/error! {:id ::unhandled-exception
-;;                                     :data ex}
-;;                                    ex)
-;;                         (http/post (str runtime-api-url "invocation/" id "/error")
-;;                                    {:body (json/encode (throwable->error-body ex))}))))
-;;                (finally (s/shutdown! initial-state))))))
-
-
 (defn -main
   [& _]
   (m/? (m/reduce conj app)))
 
 
 (comment
+  (-main)
 
-  (def config-task (m/sp 2))
-  (def data-flow (m/seed [1 2 3]))
+  (def t (m/ap (let [x 10]
+                 (m/?> (m/seed [1 2 3 x])))))
 
-  (def j (let [cfg (m/? config-task)]
-           (m/eduction (map #(* cfg %))
-                       data-flow)))
+  (m/? (m/reduce conj t))
 
-  (m/? (m/reduce conj j))
-
-
-  (def f1 (m/seed [[1 2 3] [:a :b :c]]))
-
-  (m/? (m/reduce conj (m/ap (let [is (m/?> f1)
-                                  i (m/?> (m/seed is))]
-                              (println i)))))
-
-  (def f2 (m/eduction (comp (map :data) cat) f1))
-
-  (m/? (m/reduce conj f2))
   
+
+  (m/? (m/reduce conj (try (m/eduction (map #(/ 100 %)) (m/seed [1 2 3])) (catch Exception ex (println ex)))))
+  
+
+  (def fl (m/seed [:a 1 2 3 :b [1 2] :c :q repeat 3 [:x 1] :q :d 1 2 3]))
+
+  (defn construct-mapper
+    []
+    (let [counter (atom 0)]
+      (fn [i]
+        (when (keyword? i)
+          (swap! counter inc))
+        [@counter i])))
+  
+  (def f (m/eduction (map (construct-mapper))
+                     (partition-by first)
+                     (map #(map second %))
+                     (map (fn [els]
+                            (if (= :q (first els))
+                              (when (fn? (second els))
+                                (apply (second els) (drop 2 els)))
+                              [els])))
+                     cat fl))
+
+  (m/? (m/reduce conj f))
+
+
+
+  (do
+    (require '[me.raynes.fs :as fs]
+             '[datalevin.core :as d])
+
+    (let [tmp-dir (str (fs/temp-dir "dtlv-sandbox"))
+          cn (d/get-conn tmp-dir {:a/id  {:db/valueType :db.type/long}
+                                  :a/ref {:db/valueType :db.type/ref}
+                                  :b/id  {:db/valueType :db.type/keyword}})]
+      (try (d/transact cn [{:a/id 1
+                            :a/ref :zxc}
+                           {:db/id :zxc
+                            :b/id :A}])
+           (finally
+             (d/close cn)
+             (fs/delete-dir tmp-dir)))))
   )

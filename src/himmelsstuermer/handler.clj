@@ -1,26 +1,22 @@
 (ns himmelsstuermer.handler
   (:require
-    [himmelsstuermer.api :as api]
-    [himmelsstuermer.api.vars :refer [*user* *msg*]]))
+    [himmelsstuermer.api :as api]))
 
 
 (defn delete-this-message
 
   "Handler to delete message. Deletes the message with was called from. Cleanups callbacks"
 
-  {:pre [(number? *msg*)
-         (map? *user*)]}
-
-  [_]
-  (api/delete-message *user* *msg*))
+  [{:keys [usr cbq] :as state}]
+  (api/delete-message state usr (-> cbq :message :message_id)))
 
 
 (defn main
 
   "Core handler of system. Must be overriden in project."
 
-  [_]
-  (api/send-message *user*
+  [{:keys [usr] :as state}]
+  (api/send-message state usr
                     "Hello from Himmelsstuermer Framework!" []))
 
 
@@ -28,6 +24,8 @@
 
   "Payments handler. Must be overriden in project if payments processing is necessary."
 
-  [{payment :successful_payment}]
-  (api/send-message *user*
-                    (str "Successful payment with payload " (:invoice_payload payment)) [] :temp))
+  [{:keys [usr successful_payment] :as state}]
+  (api/send-message state usr
+                    (str "Successful payment with payload "
+                         (:invoice_payload successful_payment))
+                    [] :temp))

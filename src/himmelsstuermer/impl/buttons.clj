@@ -2,8 +2,7 @@
   (:require
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.api.texts :refer [txt txti]]
-    [himmelsstuermer.impl.callbacks :as clb]
-    [himmelsstuermer.impl.state :refer [*state*]]))
+    [himmelsstuermer.impl.callbacks :as clb]))
 
 
 (defrecord XButton
@@ -12,51 +11,51 @@
 
 (extend-protocol b/KeyboardButton
   clojure.lang.PersistentArrayMap
-  (to-map [this _] this)
+  (to-map [this _ _] this)
 
   clojure.lang.PersistentHashMap
-  (to-map [this _] this)
+  (to-map [this _ _] this)
 
   himmelsstuermer.api.buttons.TextButton
-  (to-map [this user]
+  (to-map [this state user]
     {:text (:text this)
      :callback_data
-     (str (clb/set-callback user (:func this) (:args this)))})
+     (str (clb/set-callback state user (:func this) (:args this)))})
 
   himmelsstuermer.api.buttons.TxtButton
-  (to-map [this user]
-    {:text (txt (:txt this))
+  (to-map [this state user]
+    {:text (txt state (:txt this))
      :callback_data
-     (str (clb/set-callback user (:func this) (:args this)))})
+     (str (clb/set-callback state user (:func this) (:args this)))})
 
   himmelsstuermer.api.buttons.TxtiButton
-  (to-map [this user]
-    {:text (txti (:txt this) (:lang this))
+  (to-map [this state user]
+    {:text (txti state (:txt this) (:lang this))
      :callback_data
-     (str (clb/set-callback user (:func this) (:args this)))})
+     (str (clb/set-callback state user (:func this) (:args this)))})
 
   himmelsstuermer.api.buttons.HomeButton
-  (to-map [this user]
+  (to-map [this state user]
     (let [text (cond
-                 (nil? (:text this))    (txt [:home])
-                 (vector? (:text this)) (txt (:text this))
+                 (nil? (:text this))    (txt state user [:home])
+                 (vector? (:text this)) (txt state user (:text this))
                  :else                  (:text this))]
       {:text text
        :callback_data
-       (str (clb/set-callback user (-> *state* :handlers :main) {}))}))
+       (str (clb/set-callback state user (:himmelsstuermer/main-handler state) {}))}))
 
   himmelsstuermer.api.buttons.PayButton
-  (to-map [this _]
+  (to-map [this _ _]
     {:text (:text this)
      :pay true})
 
   himmelsstuermer.api.buttons.UrlButton
-  (to-map [this _]
+  (to-map [this _ _]
     {:text (:text this)
      :url (:url this)})
 
   XButton
-  (to-map [_ user]
+  (to-map [_ state user]
     {:text "✖️"
      :callback_data
-     (str (clb/set-callback user 'himmelsstuermer.handler/delete-this-message {} true))}))
+     (str (clb/set-callback state user 'himmelsstuermer.handler/delete-this-message {} true))}))

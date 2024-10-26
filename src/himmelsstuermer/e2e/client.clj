@@ -3,7 +3,7 @@
     [cheshire.core :as json]
     [himmelsstuermer.core]
     [himmelsstuermer.e2e.dummy :as dum]
-    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [malli.generator :refer [generate]]
@@ -21,11 +21,11 @@
   [data]
   (let [update      (assoc data :update_id (swap! update-id inc))
         mock-record (generate spec/Record)
-        mock-data   {:body {:Records [(assoc mock-record :body (json/encode update))]}
+        mock-data   {:body (json/encode {:Records [(assoc mock-record :body (json/encode update))]})
                      :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
     (tt/event! ::send-update {:data {:update update :mock-data mock-data}})
     (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
-    (himmelsstuermer.core/-main)))
+    ((requiring-resolve 'himmelsstuermer.core/-main))))
 
 
 (malli/=> send-action-request [:-> spec/ActionRequest :any])

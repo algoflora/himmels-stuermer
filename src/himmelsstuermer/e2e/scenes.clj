@@ -4,12 +4,12 @@
     [clojure.pprint :refer [pprint]]
     [clojure.string :as str]
     [clojure.test :refer [is testing]]
+    [himmelsstuermer.core.logging :refer [throwable->map]]
     [himmelsstuermer.e2e.client :as cl]
     [himmelsstuermer.e2e.dummy :as dum]
-    [himmelsstuermer.impl.errors :refer [handle-error]]
     [himmelsstuermer.misc :as misc]
-    [himmelsstuermer.spec :as spec]
     [himmelsstuermer.spec.blueprint :as spec.bp]
+    [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [missionary.core :as m]
@@ -193,15 +193,11 @@
 ;; TODO: Find out what the hell!
 ;; (m/=> apply-blueprint [:-> spec.bp/Blueprint :nil])
 
-(require '[himmelsstuermer.misc :refer [dbg]])
-
-
 (defn- apply-blueprint
   ([blueprint] (apply-blueprint blueprint 1))
   ([blueprint line]
    (when (not-empty blueprint)
      (let [key   (-> blueprint first namespace keyword)
-           _ (println "KEY\t" key (misc/project-info))
            dummy (cond
                    (dum/exists? key) (-> key dum/get-by-key :dummy)
 
@@ -219,10 +215,12 @@
        (apply-blueprint (drop (inc (count args)) blueprint) (inc line))))))
 
 
-(defmulti ^:private sub-flow (fn [_ x & _] (cond (fn? x) :function (vector? x) :vector)))
+(defmulti ^:private sub-scene (fn [_ x & _]
+                                (cond (fn? x) :function
+                                      (vector? x) :vector)))
 
 
-(defmethod sub-flow :vector
+(defmethod sub-scene :vector
   [_ blueprint]
   ;; TODO: Find out what the hell!
   #_(when-let [error (m/explain spec.bp/Blueprint blueprint)]
@@ -232,26 +230,26 @@
   (apply-blueprint blueprint))
 
 
-(defmethod sub-flow :function
+(defmethod sub-scene :function
   [_ f & args]
   (let [blueprint (apply f args)]
-    (sub-flow nil blueprint)))
+    (sub-scene nil blueprint)))
 
 
 (defn- check-and-close-only-temp
   [dummy & args]
   (let [ns (:username dummy)]
-    (sub-flow dummy
-              (vec (concat [(keyword ns "check-msg") 1] args
-                           [(keyword ns "click-btn") 1 "✖️" (keyword ns "check-no-temp-messages")])))))
+    (sub-scene dummy
+               (vec (concat [(keyword ns "check-msg") 1] args
+                            [(keyword ns "click-btn") 1 "✖️" (keyword ns "check-no-temp-messages")])))))
 
 
 (defn- check-and-close-last-temp
   [dummy & args]
   (let [ns (:username dummy)]
-    (sub-flow dummy
-              (vec (concat [(keyword ns "check-msg") 1] args
-                           [(keyword ns "click-btn") 1 "✖️"])))))
+    (sub-scene dummy
+               (vec (concat [(keyword ns "check-msg") 1] args
+                            [(keyword ns "click-btn") 1 "✖️"])))))
 
 
 (defn- call!
@@ -292,15 +290,15 @@
 
 
 (defn situation
-  [blueprints]
+  [scenes]
   (try
-    (doseq [[k bp] blueprints]
+    (doseq [[k bp] scenes]
       (testing (str "Scene:\t" k "\n")
         (t/with-clock *clock*
                       (apply-blueprint bp))))
     (catch Exception ex
-      (handle-error ex)
-      (throw ex))
+      (throw (tt/error! {:id ::situation-error
+                         :data (throwable->map ex)} ex)))
     (finally
       (dum/clear-all))))
 
@@ -310,10 +308,10 @@
 
 (defn get-scene
   [k]
-  (if-let [flow (k @scenes)]
-    flow
-    (throw (ex-info (format "Flow with key `%s` not found!" k)
-                    {:event :flow-not-found-error
+  (if-let [scene (k @scenes)]
+    scene
+    (throw (ex-info (format "Scene with key `%s` not found!" k)
+                    {:event :scene-not-found-error
                      :key k
                      :available-keys (keys @scenes)}))))
 
@@ -341,13 +339,13 @@
     `(do
        (clojure.test/deftest ~name
          (let [~'a-clock (t/atom)
-               ~'blueprints (mapv #(cond
-                                     (keyword? %) [% (get-scene %)]
-                                     (vector?  %) [:inline %])
-                                  ~arg)]
+               ~'scenes (mapv #(cond
+                                 (qualified-keyword? %) [% (get-scene %)]
+                                 (vector? %)            [:inline %])
+                              ~arg)]
            (System/setProperty "himmelsstuermer.test.connection-suffix" (str (random-uuid)))
            (with-redefs [himmelsstuermer.core.init/handler-main
                          ~(if (some? h) `(fn [] (m/sp ~h)) `himmelsstuermer.core.init/handler-main)]
              (binding [*clock* ~'a-clock]
-               (situation ~'blueprints)))
+               (situation ~'scenes)))
            (System/clearProperty "himmelsstuermer.test.connection-suffix"))))))

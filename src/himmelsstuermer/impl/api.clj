@@ -4,10 +4,9 @@
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.impl.buttons :as ib]
     [himmelsstuermer.impl.callbacks :as clb]
-    [himmelsstuermer.impl.db :as db]
-    [himmelsstuermer.impl.state :refer [*state*]]
+    [himmelsstuermer.impl.transactor :refer [transact! get-txs TransactionsStorage]]
     [himmelsstuermer.misc :as misc]
-    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [me.raynes.fs :as fs]
@@ -17,8 +16,8 @@
 
 
 (defn request
-  [method data]
-  (let [url  (format "https://api.telegram.org/bot%s/%s" (-> *state* :bot :token) (name method))
+  [token method data]
+  (let [url  (format "https://api.telegram.org/bot%s/%s" token (name method))
 
         {:keys [result nanos]}
         (misc/do-nanos* @(http/post url {:headers {:content-type "application/json"}
@@ -39,19 +38,23 @@
                                                        :response resp})))))
 
 
+(malli/=> api-task [:=> [:cat spec/UserState :keyword :map] spec/MissionaryTask])
+
+
 (defn api-task
-  [method data]
-  (let [api-fn (-> *state* :system :api-fn)]
+  [state method data]
+  (let [api-fn (:himmelsstuermer/api-fn state)
+        token  (-> state :bot :token)]
     (tt/event! ::calling-api-fn
                {:data {:function api-fn
                        :method method
                        :data data}})
-    #_(m/via m/blk (api-fn method data)) ; TODO: Trade-off for now to make things work
-    (m/sp (api-fn method data))))
+    (m/via m/blk (api-fn token method data))))
 
 
 (malli/=> prepare-keyboard [:=>
                             [:cat
+                             spec/UserState
                              [:maybe spec/Buttons]
                              spec/User
                              :boolean]
@@ -62,16 +65,17 @@
 
 
 (defn prepare-keyboard
-  [kbd user temp?]
+  [state kbd user temp?]
   (when kbd
     {:inline_keyboard
-     (cond-> (mapv (fn [btns] (mapv #(b/to-map % user) btns)) kbd)
-       temp? (conj [(b/to-map (ib/->XButton) user)]))}))
+     (cond-> (mapv (fn [btns] (mapv #(b/to-map % state user) btns)) kbd)
+       temp? (conj [(b/to-map (ib/->XButton) state user)]))}))
 
 
 (defn- set-callbacks-message-id
-  [user msg]
+  [state user msg]
   (clb/set-new-message-ids
+    state
     user
     (:message_id msg)
     (->> msg
@@ -178,26 +182,26 @@
 
 
 (defmethod send-to-chat :invoice
-  [_ user b options]
+  [_ state user b options]
   (let [body (prepare-body b options user)
-        new-msg (m/? (api-task :sendInvoice body))]
-    (set-callbacks-message-id user new-msg)))
+        new-msg (m/? (api-task state :sendInvoice body))]
+    (set-callbacks-message-id state user new-msg)))
 
 
-(malli/=> send-message- [:-> :map spec/MissionaryTask])
+(malli/=> send-message- [:=> [:cat spec/UserState :map] spec/MissionaryTask])
 
 
 (defn- send-message-
-  [body]
-  (api-task :sendMessage body))
+  [state body]
+  (api-task state :sendMessage body))
 
 
-(malli/=> edit-message-text- [:-> :map spec/MissionaryTask])
+(malli/=> edit-message-text- [:=> [:cat spec/UserState :map] spec/MissionaryTask])
 
 
 (defn- edit-message-text-
-  [body]
-  (m/sp (try (m/? (api-task :editMessageText body))
+  [state body]
+  (m/sp (try (m/? (api-task state :editMessageText body))
              (catch clojure.lang.ExceptionInfo ex
                (when (not= 400 (-> ex ex-data :status))
                  (throw (ex-info "Request to :editMessageText failed!"
@@ -207,15 +211,15 @@
                (tt/event! ::edit-message-failed
                           {:data {:request body
                                   :error ex}})
-               (m/? (send-message- body))))))
+               (m/? (send-message- state body))))))
 
 
 (defmethod send-to-chat :text
-  [_ user b options]
+  [_ {:keys [txs] :as state} user b options]
   (m/sp (let [body       (prepare-body b options user)
               msg-task   (if (to-edit? options user)
-                           (edit-message-text- body)
-                           (send-message- body))
+                           (edit-message-text- state body)
+                           (send-message- state body))
               new-msg    (m/? msg-task)
               new-msg-id (:message_id new-msg)]
           (tt/event! ::text-sent-to-chat {:data {:user user
@@ -225,8 +229,8 @@
           (when (and (not (:temp options)) (not= new-msg-id (:msg-id user)))
             (tt/event! ::set-user-msg-id {:data {:message new-msg
                                                  :message-id new-msg-id}})
-            (db/transact [[:db/add (:db/id user) :user/msg-id new-msg-id]]))
-          (m/? (set-callbacks-message-id user new-msg))
+            (transact! txs [[:db/add (:db/id user) :user/msg-id new-msg-id]]))
+          (m/? (set-callbacks-message-id state user new-msg))
           new-msg-id)))
 
 
@@ -234,10 +238,11 @@
 
 
 (defmethod process-args :text
-  [_ user & args]
+  [_ state user & args]
   (let [opts (->> args (filter keyword?) set)]
     {:body    {:text         (->> args (filter string?) first)
                :reply_markup (prepare-keyboard
+                               state
                                (->> args (filter vector?) first misc/remove-nils)
                                user (boolean (some #{:temp} opts)))
                :entities     (->> args (filter set?) first vec)}
@@ -246,27 +251,36 @@
 
 
 (defmethod process-args :invoice
-  ([_ user text data] (process-args :invoice user text data []))
-  ([_ user text data kbd]
+  ([_ state user text data] (process-args :invoice state user text data []))
+  ([_ state user text data kbd]
    {:body    (merge data {:reply_markup (prepare-keyboard
+                                          state
                                           (into [[(b/pay-btn text)]] kbd)
                                           user true)})
     :options {:temp true}}))
 
 
-(malli/=> send! [:=> [:cat :keyword spec/User [:* :any]] spec/MissionaryTask])
+(malli/=> send! [:=> [:cat :keyword spec/UserState spec/User [:* :any]] spec/MissionaryTask])
 
 
 (defn send!
-  [type user & args]
-  (let [{:keys [body options]} (apply process-args type user args)]
-    (send-to-chat type user body options)))
+  [type state user & args]
+  (m/sp (let [{:keys [body options]} (apply process-args type state user args)]
+          (reify
+            TransactionsStorage
+
+            (get-txs [_] (-> state :txs get-txs))
+
+
+            clojure.lang.IDeref
+
+            (deref [_] (m/? (send-to-chat type state user body options)))))))
 
 
 (defn- download-file
-  [file-path]
+  [token file-path]
   (let [uri (format "https://api.telegram.org/file/bot%s/%s"
-                    (-> *state* :bot :token) file-path)
+                    token file-path)
         ^java.io.ByteArrayInputStream bis  (-> uri http/get deref :body)
         file (fs/file fs/temp-dir (java.util.UUID/randomUUID))
         fos  (java.io.FileOutputStream. file)]
@@ -278,25 +292,25 @@
 
 
 (defn get-file
-  [file-id]
-  (m/via m/blk (let [file-path (m/? (api-task :getFile file-id))]
+  [state file-id]
+  (m/via m/blk (let [file-path (m/? (api-task state :getFile file-id))]
                  (if (fs/exists? file-path)
                    (fs/file file-path)
-                   (download-file file-path)))))
+                   (download-file (-> state :bot :token) file-path)))))
 
 
 (defn delete-message
-  [user mid]
-  (m/join (constantly nil)
-          (clb/delete user mid)
-          (api-task :deleteMessage {:chat_id (:user/id user)
-                                    :message_id mid})))
+  [state user mid]
+  (m/join (constantly (:txs state))
+          (clb/delete state user mid)
+          (api-task state :deleteMessage {:chat_id (:user/id user)
+                                          :message_id mid})))
 
 
 (defn answer-pre-checkout-query
-  ([pcq-id] (answer-pre-checkout-query pcq-id nil))
-  ([pcq-id error]
-   (api-task :answerPrecheckoutQuery (into {:pre_checkout_query_id pcq-id
-                                            :ok (nil? error)}
-                                           (when (some? error)
-                                             [:error_message error])))))
+  ([state pcq-id] (answer-pre-checkout-query state pcq-id nil))
+  ([state pcq-id error]
+   (api-task state :answerPrecheckoutQuery (into {:pre_checkout_query_id pcq-id
+                                                  :ok (nil? error)}
+                                                 (when (some? error)
+                                                   [:error_message error])))))

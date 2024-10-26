@@ -1,6 +1,6 @@
 (ns himmelsstuermer.spec.blueprint
   (:require
-    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]))
 
 

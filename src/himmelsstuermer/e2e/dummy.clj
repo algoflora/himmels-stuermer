@@ -103,6 +103,7 @@
 
 (defn get-first-message
   [dummy]
+  (println "DUMMIES\t" dummy @dummies)
   (-> dummy :username keyword ((deref dummies)) :messages first))
 
 

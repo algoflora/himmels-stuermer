@@ -9,7 +9,7 @@
 
 (defprotocol KeyboardButton
 
-  (to-map [this user]))
+  (to-map [this state user]))
 
 
 (defrecord TextButton

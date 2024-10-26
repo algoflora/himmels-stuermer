@@ -9,8 +9,8 @@
 
   {:added "0.1.0"}
 
-  [user mid]
-  (impl/delete-message user mid))
+  [state user mid]
+  (impl/delete-message state user mid))
 
 
 (defn send-message
@@ -36,8 +36,8 @@
 
   {:changed "0.1.0"}
 
-  [user & args]
-  (apply impl/send! :text user args))
+  [state user & args]
+  (apply impl/send! :text state user args))
 
 
 ;; (defn send-photo
@@ -88,9 +88,9 @@
 
   {:added "0.1.0"}
 
-  ([user data text] (send-invoice user data text []))
-  ([user data text kbd]
-   (impl/send! :invoice user text data kbd)))
+  ([state user data text] (send-invoice state user data text []))
+  ([state user data text kbd]
+   (impl/send! :invoice state user text data kbd)))
 
 
 (defn get-file
@@ -99,5 +99,5 @@
 
   {:added "0.1.0"}
 
-  [file-id]
-  (impl/get-file file-id))
+  [state file-id]
+  (impl/get-file state file-id))

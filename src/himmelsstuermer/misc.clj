@@ -24,6 +24,28 @@
      :version version}))
 
 
+(defn caller-map-fn
+  [this-ns]
+  (fn [^java.lang.StackTraceElement element]
+    (let [namespace (-> element .getClassName (str/split #"\$") first)
+          file-name (.getFileName element)
+          line      (.getLineNumber element)]
+      (when (and (str/starts-with? namespace "himmelsstuermer")
+                 (not= this-ns namespace))
+        {:namespace namespace
+         :file-name file-name
+         :line line}))))
+
+
+(defmacro get-caller
+  []
+  `(->> (Thread/currentThread)
+        .getStackTrace
+        (map (caller-map-fn ~(str *ns*)))
+        (filter some?)
+        first))
+
+
 (defn- read-resource
   [resource-url]
   (with-open [stream (io/input-stream resource-url)]

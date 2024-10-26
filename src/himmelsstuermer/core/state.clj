@@ -1,11 +1,12 @@
 (ns himmelsstuermer.core.state
   (:require
     [clojure.data :as data]
-    [clojure.string :as str]
+    [clojure.set :as set]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.init :as init]
+    [himmelsstuermer.impl.transactor :refer [new-transactions-set]]
     [himmelsstuermer.misc :as misc]
-    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.core :as spec]
     [malli.core :as malli]
     [malli.instrument :refer [instrument!]]
     [missionary.core :as m]
@@ -38,13 +39,39 @@
      :callback-query nil
      :pre-checkout-query nil
      :user nil
-     :tasks []
+     :function nil
+     :arguments {}
+     :tasks #{}
      :aws-context nil}))
+
+
+(malli/=> create-user-state [:-> spec/State spec/UserState])
+
+
+(defn construct-user-state
+  [state]
+  (let [base-map {:himmelsstuermer/api-fn (-> state :system :api-fn)
+                  :himmelsstuermer/main-handler (-> state :handlers :main)
+                  :bot (:bot state)
+                  :prf (:profile state)
+                  :cfg (-> state :project :config)
+                  :idb (:database state)
+                  :txs (new-transactions-set)
+                  :msg (:message state)
+                  :cbq (:callback-query state)
+                  :pcq (:pre-checkout-query state)
+                  :usr (:user state)}
+        arguments (:arguments state)]
+    (when (some (-> base-map keys set) (keys arguments))
+      (throw (ex-info "Forbidden key in arguments!" {:forbidden-keys (set/intersection
+                                                                       (-> arguments keys set)
+                                                                       (-> base-map keys set))})))
+    (merge base-map (:arguments state))))
 
 
 (def state
   (m/sp (let [profile @conf/profile]
-          (when (System/getProperty  "himmelsstuermer.malli.instrument" "false")
+          (when (Boolean/parseBoolean (System/getProperty  "himmelsstuermer.malli.instrument"))
             (tt/event! ::malli-instrument-run)
             (instrument! {:report
                           (fn [type data]
@@ -72,26 +99,12 @@
             state))))
 
 
-(defn- caller-map-fn
-  [^java.lang.StackTraceElement element]
-  (let [namespace (-> element .getClassName (str/split #"\$") first)
-        file-name (.getFileName element)
-        line      (.getLineNumber element)]
-    (when (and (str/starts-with? namespace "himmelsstuermer")
-               (not= "himmelsstuermer.core.state" namespace))
-      {:namespace namespace
-       :file-name file-name
-       :line line})))
-
-
 (malli/=> modify-state [:=> [:cat spec/State fn?] spec/State])
 
 
 (defn modify-state
   [state modify-fn]
-  (let [stack-trace     (Thread/currentThread)
-        trace           (.getStackTrace stack-trace)
-        caller          (->> trace (map caller-map-fn) (filter some?) first)
+  (let [caller          (misc/get-caller)
         state'          (modify-fn state)
         [removed added] (data/diff state state')]
     (tt/set-ctx! (assoc tt/*ctx* :state state'))
@@ -107,4 +120,4 @@
 
 (defn shutdown!
   [state]
-  #_(d/close (-> state :system :db-conn)))
+  #_(d/close (-> state :system :db-conn))) ; TODO: Check this behaviour twice!

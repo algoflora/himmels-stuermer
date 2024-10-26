@@ -2,7 +2,7 @@
   (:require
     [datalevin.core :as d]
     [himmelsstuermer.core.state :as s]
-    [himmelsstuermer.spec :as spec]
+    [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [missionary.core :as m]
@@ -39,7 +39,7 @@
   (let [uuid (random-uuid)
         user (into {}
                    (filter #(-> % second some?))
-                   {:db/id -1
+                   {:db/id -999
                     :user/uuid uuid
                     :user/id (:id udata)
                     :user/username (:username udata)
@@ -51,7 +51,7 @@
            {:callback/uuid uuid
             :callback/function handler-main
             :callback/arguments {}
-            :callback/user -1
+            :callback/user -999
             :callback/service? false}]]))
 
 
@@ -83,13 +83,13 @@
                [user? user-callback? callback?]
                (first (d/q query database (:id from) uuid))
 
-               data (d/q query database (:id from) uuid)
-               datoms (mapv str (d/datoms database :eav))
-               id (:id from)
-               _ (tt/event! ::query-test {:data {:?uid id
-                                                 :?uuid uuid
-                                                 :datoms datoms
-                                                 :result data}})
+               ;; data (d/q query database (:id from) uuid)
+               ;; datoms (mapv str (d/datoms database :eav))
+               ;; id (:id from)
+               ;; _ (tt/event! ::query-test {:data {:?uid id
+               ;;                                   :?uuid uuid
+               ;;                                   :datoms datoms
+               ;;                                   :result data}})
 
                [user tx-data]   (cond
                                   (nil? user?)
@@ -99,12 +99,12 @@
                                   (renew user? from)
 
                                   :else [user? []])
-               function         (requiring-resolve (or (:callback/function callback?) (-> state :handlers :main)))
-               arguments        (assoc (or (:callback/arguments callback?) {}) :message (:message state))
-               task             (m/sp (m/? (apply function (if (sequential? arguments) arguments [arguments]))))]
+               function         @(requiring-resolve (or (:callback/function callback?) (-> state :handlers :main)))
+               arguments        (or (:callback/arguments callback?) {})]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
-                                    (and (not= (-> state :handlers :main) (:callback/function user-callback?))
+                                    (and (not=   (-> state :handlers :main)
+                                                 (:callback/function user-callback?))
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
                                                                :callback/function (-> state :handlers :main)
@@ -112,5 +112,6 @@
 
                                     :always (->
                                               (assoc :user user)
-                                              (update :tasks conj task)
+                                              (assoc :function function)
+                                              (assoc :arguments arguments)
                                               (update :transaction into tx-data))))))))

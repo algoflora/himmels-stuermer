@@ -1,6 +1,5 @@
 (ns himmelsstuermer.impl.texts
   (:require
-    [himmelsstuermer.impl.state :refer [*state*]]
     [himmelsstuermer.misc :refer [read-resource-dir]]
     [missionary.core :as m]))
 
@@ -8,20 +7,20 @@
 (def ^:private texts
   (into {} (->> (m/? (read-resource-dir "texts")) ; TODO: Think about wrapping all this to tasks
                 (map #(into {} [%]))
-                (apply merge))))
+                (apply merge)))) ; TODO: Think about moving this to state
 
 
 (defmulti txti (fn [_ path & _] (seqable? path)))
 
 
 (defmethod txti false
-  [lang path & args]
-  (apply txti lang (vector path) args))
+  [state lang path & args]
+  (apply txti state lang (vector path) args))
 
 
 (defmethod txti true
-  [lang path & args]
-  (let [default-lang (-> *state* :bot :default-language-code)
+  [state lang path & args]
+  (let [default-lang (-> state :bot :default-language-code)
         [path# form] (if (-> path last int?)
                        [(->> path (drop-last 1) vec) (last path)]
                        [(vec path) 0])

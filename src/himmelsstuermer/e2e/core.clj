@@ -9,11 +9,11 @@
 
 (defmulti ^:private serve (fn [method _] method))
 
-(m/=> request [:=> [:cat :keyword spec.tg/Request] :any])
+(m/=> request [:=> [:cat :string :keyword spec.tg/Request] :any])
 
 
 (defn request
-  [method body]
+  [_ method body]
   (tt/event! ::request-received
              {:data {:method method
                      :body body}})

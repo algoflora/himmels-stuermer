@@ -26,8 +26,8 @@
     (let [profile @profile
           cfg (read-config (io/resource "himmelsstuermer-resources/config.edn")
                            {:profile profile})]
-      (tt/event! ::himmelstuermer-config-file-loaded {:data {:profile profile
-                                                             :config cfg}})
+      (tt/event! ::himmelsstuermer-config-file-loaded {:data {:profile profile
+                                                              :config cfg}})
       cfg)))
 
 
