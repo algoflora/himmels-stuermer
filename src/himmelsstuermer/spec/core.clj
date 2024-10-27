@@ -49,7 +49,7 @@
 
 (def User
   [:map {:closed true}
-   [:db/id [:or :int :keyword]]
+   [:db/id :int]
    [:user/uuid :uuid]
    [:user/username {:optional true} :string]
    [:user/id :int]

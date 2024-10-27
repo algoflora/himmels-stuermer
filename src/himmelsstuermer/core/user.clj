@@ -39,7 +39,7 @@
   (let [uuid (random-uuid)
         user (into {}
                    (filter #(-> % second some?))
-                   {:db/id "new-user"
+                   {:db/id -1
                     :user/uuid uuid
                     :user/id (:id udata)
                     :user/username (:username udata)
@@ -51,7 +51,7 @@
            {:callback/uuid uuid
             :callback/function handler-main
             :callback/arguments (prn-str {})
-            :callback/user "new-user"
+            :callback/user -1
             :callback/service? false}]]))
 
 

@@ -27,7 +27,8 @@
 (def db-conn
   (m/sp (let [store-cfg (or (:db/conf (m/? conf/config))
                             {:backend  :mem
-                             :id       (str (random-uuid))})
+                             :id       (System/getProperty "himmelsstuermer.test.database.id"
+                                                           (str (random-uuid)))})
               schema    (m/? (m/join (fn [init & more]
                                        (into init cat more))
                                      himmelsstuermer-schema
@@ -112,28 +113,3 @@
   (m/sp (let [cfg (:project/config (m/? conf/config))]
           (tt/event! ::init-project-config {:data {:config cfg}})
           {:project/config cfg})))
-
-
-(comment
-
-  (def cfg {:store #_{:backend  :file
-                    :path     (str "/tmp/datahike-sandbox-" (random-uuid))}
-
-            {:backend  :mem
-             :id       (str (random-uuid))}
-            :index              :datahike.index/hitchhiker-tree
-            :schema-flexibility :write
-            :keep-history?      true
-            :attribute-refs?    false})
-
-  (d/database-exists? cfg)
-  (def db (d/create-database cfg))
-
-  (def cn (d/connect cfg))
-
-  (println cn)
-  
-  (def dbt (m/sp @cn))
-
-  (m/? dbt)
- )

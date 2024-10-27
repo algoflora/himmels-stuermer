@@ -3,6 +3,7 @@
   (:require
     [cheshire.core :as json]
     [clojure.string :as str]
+    [clojure.walk :refer [postwalk]]
     [datahike.api :as d]
     [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
@@ -16,6 +17,12 @@
     [missionary.core :as m]
     [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
+
+
+(defn- json-decode
+  [s]
+  (postwalk #(if (instance? java.lang.Integer %) (long %) %)
+            (json/decode s keyword)))
 
 
 (defmulti ^:private handle-update- (fn [a & _] a))
@@ -88,14 +95,9 @@
 
 (defn- load-database
   [s]
-  (let [_ (tt/event! ::load-database)
-        conn  (-> s :system :db-conn)
-        _ (tt/event! ::check-conn {:data {:conn conn}})
-        ;; db @conn
-        ;; _ (tt/event! ::check-db {:data {:conn conn :db db}})
-        state s #_(s/modify-state s #(assoc % :database (-> s :system :db-conn deref)))
+  (let [state (s/modify-state s #(assoc % :database @(-> s :system :db-conn)))
         db    (:database state)]
-    (tt/event! ::loaded-database {:data {:database db}})
+    (tt/event! ::loaded-database {:data {:database (str db)}})
     state))
 
 
@@ -104,7 +106,7 @@
 
 (defn- handle-record
   [s record]
-  (m/sp (let [body  (-> record :body (json/decode keyword))
+  (m/sp (let [body  (-> record :body json-decode)
               state (load-database s)]
           (cond
             (malli/validate spec.tg/Update body)
@@ -146,18 +148,19 @@
   [state tx-set]
   (m/via m/blk
          (tt/event! ::persisting-data {:data {:tx-set tx-set}})
-         (d/transact! (-> state :system :db-conn) (seq tx-set))))
+         (d/transact (-> state :system :db-conn) (seq tx-set))))
 
 
 (defn- execute-business-logic
   ([state tasks] (execute-business-logic state tasks false))
   ([state tasks fallback?]
    (m/sp (if fallback?
-           (tt/event! ::executing-business-logic-fallback {:data {:tasks tasks}})
+           (tt/event! ::executing-fallback {:data {:tasks tasks}})
            (tt/event! ::executing-business-logic {:data {:tasks tasks}}))
-         (try (let [tx-set    (m/? (perform-tasks state tasks))]
-                (:tx-data (m/? (persist-data state tx-set)))
-                (tt/event! ::execute-finished))
+         (try (let [tx-set    (m/? (perform-tasks state tasks))
+                    tx-report (sort-by first (map seq (:tx-data (m/? (persist-data state tx-set)))))]
+                (tt/event! ::execute-finished {:data {:tx-set tx-set
+                                                      :tx-report tx-report}}))
               (catch Exception exc
                 (let [exc-map (throwable->map exc)]
                   (if fallback?
@@ -207,7 +210,7 @@
           (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
                                         {:state   (s/modify-state initial-state
                                                                   #(assoc % :aws-context headers))
-                                         :records (:Records (json/decode body keyword))}))
+                                         :records (:Records (json-decode body))}))
                                  invocations))
                (finally (s/shutdown! initial-state))))))
 

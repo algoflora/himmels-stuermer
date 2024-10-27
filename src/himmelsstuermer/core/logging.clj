@@ -3,6 +3,7 @@
     [cheshire.core :as json]
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
+    [datahike.db]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
@@ -34,7 +35,7 @@
 
 
 (def console-json-handler
-  (tt/handler:console {:output-fn (tt/pr-signal-fn {:pr-fn json/generate-string})}))
+  (tt/handler:console {:output-fn (tt/pr-signal-fn {:pr-fn json/encode})}))
 
 
 (defn- file-json-disposable-handler
@@ -72,7 +73,7 @@
   (cond-> obj
     (instance? Throwable obj) throwable->map
 
-    ;; (instance? datalevin.db.DB obj) ((constantly "<DATALEVIN DB>"))
+    (instance? datahike.db.DB obj) ((constantly "<DATAHIKE DB>"))
 
     (or (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str

@@ -52,8 +52,9 @@
                                 (d/q '[:find ?cb
                                        :in $ ?uid ?mid
                                        :where
+                                       [?u :user/id ?uid]
                                        [?cb :callback/message-id ?mid]
-                                       [?cb :callback/user [:user/id ?uid]]]
+                                       [?cb :callback/user ?u]]
                                      (:idb state) (:user/id user) mid)
                                 #{})
               tx-data (into [] (map #(vector :db/retractEntity (first %))) eids-to-retract)]
@@ -70,19 +71,19 @@
 (defn set-new-message-ids
   [{:keys [idb txs]} user mid uuids]
   (m/sp (let [ueid (:db/id user)
-              uuids-to-retract (if (pos-int? ueid)
-                                 (d/q '[:find [?uuid ...]
-                                        :in $ ?ueid ?mid ?uuids
-                                        :where
-                                        [?cb :callback/user ?ueid]
-                                        [?cb :callback/message-id ?mid]
-                                        [?cb :callback/uuid ?uuid]
-                                        (not-join [?uuid]
-                                                  [(contains? ?uuids ?uuid)])]
-                                      idb ueid mid (set uuids))
-                                 #{})
+              eids-to-retract (if (pos-int? ueid)
+                                (d/q '[:find [?cb ...]
+                                       :in $ ?ueid ?mid ?uuids
+                                       :where
+                                       [?cb :callback/user ?ueid]
+                                       [?cb :callback/message-id ?mid]
+                                       [?cb :callback/uuid ?uuid]
+                                       (not-join [?uuid]
+                                                 [(contains? ?uuids ?uuid)])]
+                                     idb ueid mid (set uuids))
+                                #{})
               tx-data (-> #{}
-                          (into (map #(vector :db/retractEntity [:callback/uuid %]) uuids-to-retract))
+                          (into (map #(vector :db/retractEntity %) eids-to-retract))
                           (into (map #(array-map :callback/uuid % :callback/message-id mid) uuids)))]
           (transact! txs tx-data)
           (tt/event! ::callbacks-set-new-message-ids
