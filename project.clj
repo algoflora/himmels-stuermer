@@ -16,7 +16,8 @@
                  [resauce "0.2.0"]
                  [tick/tick "1.0"]]
 
-  :plugins [[jonase/eastwood "1.4.3"]]
+  :plugins [[jonase/eastwood "1.4.3"]
+            [lein-ancient "1.0.0-RC3"]]
 
   :clj-kondo {:config "./clj-kondo-config.edn"}
 
@@ -37,10 +38,15 @@
                               "--add-opens=java.base/java.nio=ALL-UNNAMED"
                               "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}
              :uberjar {:dependencies [[org.clojars.huahaiy/datalevin-native "0.9.12"]]
+                       :resource-paths ["libs/datalevin-native-0.9.12.jar"]
                        :aot [himmelsstuermer.core]
                        :uberjar-name "uberjar.jar"
                        :uberjar-exclusions ["himmelsstuermer.aws.*"]
                        :env {:DTLV_COMPILE_NATIVE "true"
-                             :USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM "false"}
-                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}}
+                             ;; :USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM "false"
+                             }
+                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"
+                                  "-Dhimmelsstuermer.profile=aws"
+                                  "--add-opens=java.base/java.nio=ALL-UNNAMED"
+                                  "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}}
   :aliases {"test"   ["with-profile" "dev" "run" "-m" "kaocha.runner" "--fail-fast"]})

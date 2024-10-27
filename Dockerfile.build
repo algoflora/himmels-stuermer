@@ -7,17 +7,13 @@ ENV TARGET_ARCH=aarch64
 
 RUN dnf install -y \
     bash \
-    gcc \
-    glibc-devel \
     gzip \
-    libstdc++-static \
-    tar \
-    zlib-devel
+    tar
 
 # Install GraalVM
 
-ENV GRAALVM_FILENAME="graalvm-ce-java11-linux-${TARGET_ARCH}-${GRAALVM_VERSION}.tar.gz"
-RUN curl -Lo /graalvm.tar.gz "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/${GRAALVM_FILENAME}"
+ENV GRAALVM_FILENAME="graalvm-ce-java19-linux-${TARGET_ARCH}-${GRAALVM_VERSION}.tar.gz"
+RUN curl -Lo /graalvm.tar.gz "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/${GRAALVM_FILENAME}" # "https://download.oracle.com/graalvm/23/latest/graalvm-jdk-23_linux-aarch64_bin.tar.gz"
 RUN mkdir /graalvm
 RUN tar -xzvf /graalvm.tar.gz -C /graalvm --strip-components=1
 ENV JAVA_HOME=/graalvm
@@ -31,6 +27,18 @@ RUN mv /lein /usr/bin/
 RUN chmod +x /usr/bin/lein
 RUN lein
 
+# Install more packages
+
+RUN dnf install -y \
+    gcc \
+    glibc-devel \
+    # java-23-amazon-corretto-devel \
+    zlib-devel \
+    libstdc++-static
+
+RUN dnf clean all
+
+
 # Copy project
 
 COPY . /app
@@ -39,7 +47,7 @@ WORKDIR /app
 # Build uberjarNecessacy env vars
 
 ENV DTLV_COMPILE_NATIVE=true
-ENV USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM=false
+# ENV USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM=false
 
 # Run build script
 
