@@ -2,7 +2,7 @@
   (:require
     [clojure.edn :as edn]
     [clojure.java.io :as io]
-    [datalevin.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.misc :refer [read-resource-dir]]
     [missionary.core :as m]
@@ -25,20 +25,27 @@
 
 
 (def db-conn
-  (m/sp (let [conn-str (or (:db/conn (m/? conf/config))
-                           (format "/tmp/himmelsstuermer-test/%s"
-                                   (System/getProperty "himmelsstuermer.test.connection-suffix"
-                                                       (str (java.util.UUID/randomUUID)))))
-              opts     {:validate-data? true
-                        :closed-schema? true
-                        :auto-entity-time? false}
-              schema   (m/? (m/join (fn [init more]
-                                      (apply merge init more))
-                                    himmelsstuermer-schema
-                                    (read-resource-dir "schema")))
-              conn     (d/get-conn conn-str schema opts)]
-          (tt/event! ::init-db-conn {:data {:connection-string conn-str
-                                            :schema schema
+  (m/sp (let [store-cfg (or (:db/conf (m/? conf/config))
+                            {:backend  :mem
+                             :id       (str (random-uuid))})
+              schema    (m/? (m/join (fn [init & more]
+                                       (into init cat more))
+                                     himmelsstuermer-schema
+                                     (read-resource-dir "schema")))
+              opts      {:store              store-cfg
+                         :schema-flexibility :write
+                         :index              ({:mem :datahike.index/persistent-set}
+                                              (:backend store-cfg)
+                                              :datahike.index/hitchhiker-tree)
+                         :keep-history?      true
+                         :attribute-refs?    false
+                         :initial-tx         schema}
+
+              conn      (do (when-not (d/database-exists? {:store store-cfg})
+                              (let [db (d/create-database opts)]
+                                (tt/event! ::database-created {:data {:database db}})))
+                            (d/connect {:store store-cfg}))]
+          (tt/event! ::init-db-conn {:data {:store-config store-cfg
                                             :options opts
                                             :connection conn}})
           {:db/conn conn})))
@@ -105,3 +112,28 @@
   (m/sp (let [cfg (:project/config (m/? conf/config))]
           (tt/event! ::init-project-config {:data {:config cfg}})
           {:project/config cfg})))
+
+
+(comment
+
+  (def cfg {:store #_{:backend  :file
+                    :path     (str "/tmp/datahike-sandbox-" (random-uuid))}
+
+            {:backend  :mem
+             :id       (str (random-uuid))}
+            :index              :datahike.index/hitchhiker-tree
+            :schema-flexibility :write
+            :keep-history?      true
+            :attribute-refs?    false})
+
+  (d/database-exists? cfg)
+  (def db (d/create-database cfg))
+
+  (def cn (d/connect cfg))
+
+  (println cn)
+  
+  (def dbt (m/sp @cn))
+
+  (m/? dbt)
+ )

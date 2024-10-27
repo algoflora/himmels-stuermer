@@ -1,7 +1,7 @@
 (ns himmelsstuermer.e2e-test.handler
   (:require
     [clojure.string :as str]
-    [datalevin.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.api :as api]
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.api.transactor :refer [transact!]]

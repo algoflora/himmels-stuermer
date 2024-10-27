@@ -3,7 +3,7 @@
   (:require
     [cheshire.core :as json]
     [clojure.string :as str]
-    [datalevin.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
@@ -13,7 +13,6 @@
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
-    [me.raynes.fs :as fs]
     [missionary.core :as m]
     [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
@@ -89,7 +88,12 @@
 
 (defn- load-database
   [s]
-  (let [state (s/modify-state s #(assoc % :database (-> s :system :db-conn d/db)))
+  (let [_ (tt/event! ::load-database)
+        conn  (-> s :system :db-conn)
+        _ (tt/event! ::check-conn {:data {:conn conn}})
+        ;; db @conn
+        ;; _ (tt/event! ::check-db {:data {:conn conn :db db}})
+        state s #_(s/modify-state s #(assoc % :database (-> s :system :db-conn deref)))
         db    (:database state)]
     (tt/event! ::loaded-database {:data {:database db}})
     state))
@@ -166,10 +170,10 @@
                       (m/? (execute-business-logic state #{fallback-task} true))))))))))
 
 
-(malli/=> handle [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
+(malli/=> handle-core [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
-(defn handle
+(defn handle-core
   [state record]
   (m/sp (tt/event! ::handle-core {:data {:record record}}) ; TODO: check "private" chats, "/start" command, etc...
         (let [state (m/? (handle-record state record))
@@ -215,7 +219,7 @@
              (try (m/? (m/reduce (constantly :processed)
                                  (m/ap (let [record (m/?> (m/seed records))]
                                          (reset-nano-timer!)
-                                         (m/? (handle state record))
+                                         (m/? (handle-core state record))
                                          (tt/event! ::record-processed)
                                          (tt/set-ctx! (assoc tt/*ctx* :state state))))))
 

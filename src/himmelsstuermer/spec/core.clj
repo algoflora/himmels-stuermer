@@ -1,7 +1,6 @@
 (ns himmelsstuermer.spec.core
   (:require
-    [datalevin.core :as d]
-    [datalevin.db]
+    [datahike.spec :as spec.dh]
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.impl.transactor]
     [himmelsstuermer.spec.telegram :as spec.tg]))
@@ -75,7 +74,7 @@
   [:map {:closed true}
    [:profile :keyword]
    [:system [:map {:closed true}
-             [:db-conn [:fn #(d/conn? %)]]
+             [:db-conn [:fn spec.dh/SConnection]]
              [:api-fn fn?]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
@@ -91,7 +90,7 @@
               [:name :string]
               [:version :string]
               [:config :map]]]
-   [:database [:maybe [:fn #(instance? datalevin.db.DB %)]]]
+   [:database [:maybe [:fn spec.dh/SDB]]]
    [:action [:maybe Action]]
    [:update [:maybe spec.tg/Update]]
    [:message [:maybe spec.tg/Message]]
@@ -115,7 +114,7 @@
           [:default-language-code :keyword]]]
    [:prf :keyword]
    [:cfg :map]
-   [:idb [:fn #(instance? datalevin.db.DB %)]]
+   [:idb [:fn spec.dh/SDB]]
    [:txs [:fn #(satisfies? himmelsstuermer.impl.transactor/TransactionsAccumulator %)]]
    [:msg [:maybe spec.tg/Message]]
    [:cbq [:maybe spec.tg/CallbackQuery]]

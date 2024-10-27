@@ -5,7 +5,7 @@
   [:map
    {:closed true}
    [:api/fn :symbol]
-   [:db/conn [:maybe :string]]
+   [:db/conf [:maybe [:map-of :keyword :any]]]
    [:bot/default-language-code :keyword]
    [:bot/roles [:map-of :keyword [:vector [:or :int :string :keyword]]]]
    [:handler/main :symbol]
@@ -30,7 +30,7 @@
   [:map
    {:closed true}
    [:api/fn :symbol]
-   [:db/conn [:maybe :string]]
+   [:db/conf [:maybe [:map-of :keyword :any]]]
    [:bot/token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
    [:bot/default-language-code :keyword]
    [:bot/roles [:map-of :keyword [:vector [:or :int :string :keyword]]]]

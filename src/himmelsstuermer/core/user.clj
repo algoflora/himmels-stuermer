@@ -1,6 +1,6 @@
 (ns himmelsstuermer.core.user
   (:require
-    [datalevin.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
@@ -39,7 +39,7 @@
   (let [uuid (random-uuid)
         user (into {}
                    (filter #(-> % second some?))
-                   {:db/id -999
+                   {:db/id "new-user"
                     :user/uuid uuid
                     :user/id (:id udata)
                     :user/username (:username udata)
@@ -50,8 +50,8 @@
     [user [user
            {:callback/uuid uuid
             :callback/function handler-main
-            :callback/arguments {}
-            :callback/user -999
+            :callback/arguments (prn-str {})
+            :callback/user "new-user"
             :callback/service? false}]]))
 
 
@@ -105,7 +105,7 @@
                                     (-> state :handlers :payment)
                                     (or (:callback/function callback?)
                                         (-> state :handlers :main))))
-               arguments        (or (:callback/arguments callback?) {})]
+               arguments        (read-string (or (:callback/arguments callback?) "{}"))]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
                                     (and (not=   (-> state :handlers :main)
@@ -113,7 +113,7 @@
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
                                                                :callback/function (-> state :handlers :main)
-                                                               :callback/arguments {}})
+                                                               :callback/arguments (prn-str {})})
 
                                     :always (->
                                               (assoc :user user)
