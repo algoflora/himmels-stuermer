@@ -7,10 +7,10 @@
                  [cheshire "5.13.0"]
                  [com.hyperfiddle/rcf "20220926-202227"]
                  [com.taoensso/telemere "1.0.0-beta25"]
-                 [datalevin "0.9.12"]
+                 [io.replikativ/datahike "0.6.1591"]
                  [http-kit/http-kit "2.8.0"]
                  [me.raynes/fs "1.4.6"]
-                 [metosin/malli "0.16.3"]
+                 [metosin/malli "0.16.4"]
                  [missionary "b.40"]
                  [org.clojure/clojure "1.12.0"]
                  [resauce "0.2.0"]
@@ -27,8 +27,6 @@
 
   :target-path "target/%s"
 
-  :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
-             "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
   :profiles {:dev {:dependencies [[lambdaisland/kaocha "1.91.1392"
                                    :exclusions [net.incongru.watchservice/barbary-watchservice]]]
                    :source-paths ["src"]
@@ -37,16 +35,8 @@
                               "-Dhimmelsstuermer.profile=test"
                               "--add-opens=java.base/java.nio=ALL-UNNAMED"
                               "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}
-             :uberjar {:dependencies [[org.clojars.huahaiy/datalevin-native "0.9.12"]]
-                       :resource-paths ["libs/datalevin-native-0.9.12.jar"]
-                       :aot [himmelsstuermer.core]
+             :uberjar {:aot [himmelsstuermer.core]
                        :uberjar-name "uberjar.jar"
                        :uberjar-exclusions ["himmelsstuermer.aws.*"]
-                       :env {:DTLV_COMPILE_NATIVE "true"
-                             ;; :USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM "false"
-                             }
-                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"
-                                  "-Dhimmelsstuermer.profile=aws"
-                                  "--add-opens=java.base/java.nio=ALL-UNNAMED"
-                                  "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}}
+                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}}
   :aliases {"test"   ["with-profile" "dev" "run" "-m" "kaocha.runner" "--fail-fast"]})

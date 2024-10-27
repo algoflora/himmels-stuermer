@@ -1,7 +1,7 @@
 (ns himmelsstuermer.e2e-test.handler
   (:require
     [clojure.string :as str]
-    [datalevin.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.api :as api]
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.api.transactor :refer [transact!]]
@@ -48,7 +48,8 @@
   (let [name (ffirst (d/q '[:find ?n
                             :in $ ?uid
                             :where
-                            [?e :test-entity/user [:user/id ?uid]]
+                            [?u :user/id ?uid]
+                            [?e :test-entity/user ?u]
                             [?e :test-entity/data ?n]] idb (:user/id usr)))]
     (api/send-message state usr name [])))
 

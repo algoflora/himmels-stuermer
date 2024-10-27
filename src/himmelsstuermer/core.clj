@@ -3,7 +3,8 @@
   (:require
     [cheshire.core :as json]
     [clojure.string :as str]
-    [datalevin.core :as d]
+    [clojure.walk :refer [postwalk]]
+    [datahike.api :as d]
     [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
@@ -13,10 +14,15 @@
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
-    [me.raynes.fs :as fs]
     [missionary.core :as m]
     [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
+
+
+(defn- json-decode
+  [s]
+  (postwalk #(if (instance? java.lang.Integer %) (long %) %)
+            (json/decode s keyword)))
 
 
 (defmulti ^:private handle-update- (fn [a & _] a))
@@ -89,9 +95,9 @@
 
 (defn- load-database
   [s]
-  (let [state (s/modify-state s #(assoc % :database (-> s :system :db-conn d/db)))
+  (let [state (s/modify-state s #(assoc % :database @(-> s :system :db-conn)))
         db    (:database state)]
-    (tt/event! ::loaded-database {:data {:database db}})
+    (tt/event! ::loaded-database {:data {:database (str db)}})
     state))
 
 
@@ -100,7 +106,7 @@
 
 (defn- handle-record
   [s record]
-  (m/sp (let [body  (-> record :body (json/decode keyword))
+  (m/sp (let [body  (-> record :body json-decode)
               state (load-database s)]
           (cond
             (malli/validate spec.tg/Update body)
@@ -142,18 +148,19 @@
   [state tx-set]
   (m/via m/blk
          (tt/event! ::persisting-data {:data {:tx-set tx-set}})
-         (d/transact! (-> state :system :db-conn) (seq tx-set))))
+         (d/transact (-> state :system :db-conn) (seq tx-set))))
 
 
 (defn- execute-business-logic
   ([state tasks] (execute-business-logic state tasks false))
   ([state tasks fallback?]
    (m/sp (if fallback?
-           (tt/event! ::executing-business-logic-fallback {:data {:tasks tasks}})
+           (tt/event! ::executing-fallback {:data {:tasks tasks}})
            (tt/event! ::executing-business-logic {:data {:tasks tasks}}))
-         (try (let [tx-set    (m/? (perform-tasks state tasks))]
-                (:tx-data (m/? (persist-data state tx-set)))
-                (tt/event! ::execute-finished))
+         (try (let [tx-set    (m/? (perform-tasks state tasks))
+                    tx-report (sort-by first (map seq (:tx-data (m/? (persist-data state tx-set)))))]
+                (tt/event! ::execute-finished {:data {:tx-set tx-set
+                                                      :tx-report tx-report}}))
               (catch Exception exc
                 (let [exc-map (throwable->map exc)]
                   (if fallback?
@@ -166,10 +173,10 @@
                       (m/? (execute-business-logic state #{fallback-task} true))))))))))
 
 
-(malli/=> handle [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
+(malli/=> handle-core [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
-(defn handle
+(defn handle-core
   [state record]
   (m/sp (tt/event! ::handle-core {:data {:record record}}) ; TODO: check "private" chats, "/start" command, etc...
         (let [state (m/? (handle-record state record))
@@ -203,7 +210,7 @@
           (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
                                         {:state   (s/modify-state initial-state
                                                                   #(assoc % :aws-context headers))
-                                         :records (:Records (json/decode body keyword))}))
+                                         :records (:Records (json-decode body))}))
                                  invocations))
                (finally (s/shutdown! initial-state))))))
 
@@ -215,7 +222,7 @@
              (try (m/? (m/reduce (constantly :processed)
                                  (m/ap (let [record (m/?> (m/seed records))]
                                          (reset-nano-timer!)
-                                         (m/? (handle state record))
+                                         (m/? (handle-core state record))
                                          (tt/event! ::record-processed)
                                          (tt/set-ctx! (assoc tt/*ctx* :state state))))))
 

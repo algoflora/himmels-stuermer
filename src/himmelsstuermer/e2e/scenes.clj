@@ -344,7 +344,7 @@
                                  (qualified-keyword? %) [% (get-scene %)]
                                  (vector? %)            [:inline %])
                               ~arg)]
-           (System/setProperty "himmelsstuermer.test.connection-suffix" (str (random-uuid)))
+           (System/setProperty "himmelsstuermer.test.database.id" (str (random-uuid)))
            (with-redefs [himmelsstuermer.core.init/handler-main
                          ~(if (some? h)
                             `(m/sp
@@ -353,4 +353,4 @@
                             `himmelsstuermer.core.init/handler-main)]
              (binding [*clock* ~'a-clock]
                (situation ~'scenes)))
-           (System/clearProperty "himmelsstuermer.test.connection-suffix"))))))
+           (System/clearProperty "himmelsstuermer.test.database.id"))))))
