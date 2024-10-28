@@ -1,0 +1,10 @@
+{
+  "resources": [
+    {
+      "pattern": "clojure/core/.*"
+    },
+    {
+      "pattern": "clojure/spec/.*"
+    }
+  ]
+}

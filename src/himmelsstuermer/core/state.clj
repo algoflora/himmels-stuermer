@@ -3,6 +3,7 @@
     [clojure.data :as data]
     [clojure.set :as set]
     [himmelsstuermer.core.config :as conf]
+    [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.init :as init]
     [himmelsstuermer.impl.transactor :refer [new-transactions-set]]
     [himmelsstuermer.misc :as misc]
@@ -20,14 +21,10 @@
   [profile & args]
   (let [data (apply merge args)]
     {:profile profile
-     :system {:db-conn (:db/conn data)
-              :api-fn (:api/fn data)}
+     :system {:db-conn (:db/conn data)}
      :bot {:token (:bot/token data)
            :roles (:bot/roles data)
            :default-language-code (:bot/default-language-code data)}
-     :actions {:namespace (:actions/namespace data)}
-     :handlers {:main (:handler/main data)
-                :payment (:handler/payment data)}
      :project (assoc (misc/project-info)
                      :config
                      (:project/config data))
@@ -50,8 +47,7 @@
 
 (defn construct-user-state
   [state]
-  (let [base-map {:himmelsstuermer/api-fn (-> state :system :api-fn)
-                  :himmelsstuermer/main-handler (-> state :handlers :main)
+  (let [base-map {:himmelsstuermer/main-handler (symbol disp/main-handler)
                   :bot (:bot state)
                   :prf (:profile state)
                   :cfg (-> state :project :config)
@@ -86,14 +82,10 @@
                               (throw (tt/error! {:id type
                                                  :data data'} exception))))}))
           (let [state (m/? (m/join (partial create-state profile)
-                                   init/api-fn
                                    init/db-conn
                                    init/bot-token
                                    init/bot-default-language-code
                                    init/bot-roles
-                                   init/handler-main
-                                   init/handler-payment
-                                   init/actions-namespace
                                    init/project-config))]
             (tt/event! ::state-created {:data state})
             state))))

@@ -9,14 +9,6 @@
     [taoensso.telemere :as tt]))
 
 
-(def api-fn
-  (m/sp (let [sym  (:api/fn (m/? conf/config))
-              func (requiring-resolve sym)]
-          (tt/event! ::init-api-fn {:data {:symbol sym
-                                           :function func}})
-          {:api/fn @func})))
-
-
 (def ^:private himmelsstuermer-schema
   (m/sp (-> "himmelsstuermer-resources/schema.edn"
             io/resource
@@ -89,24 +81,6 @@
                           roles-data)]
           (tt/event! ::init-bot-roles {:data {:roles roles}})
           {:bot/roles roles})))
-
-
-(def handler-main
-  (m/sp (let [sym (:handler/main (m/? conf/config))]
-          (tt/event! ::init-handler-main {:data {:symbol sym}})
-          {:handler/main sym})))
-
-
-(def handler-payment
-  (m/sp (let [sym  (:handler/payment (m/? conf/config))]
-          (tt/event! ::init-handler-payment {:data {:symbol sym}})
-          {:handler/payment sym})))
-
-
-(def actions-namespace
-  (m/sp (let [sym (:actions/namespace (m/? conf/config))]
-          (tt/event! ::init-actions-namespace {:data {:symbol sym}})
-          {:actions/namespace sym})))
 
 
 (def project-config

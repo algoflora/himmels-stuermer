@@ -1,6 +1,7 @@
 (ns himmelsstuermer.core.user
   (:require
     [datahike.api :as d]
+    [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
@@ -93,26 +94,24 @@
 
                [user tx-data]   (cond
                                   (nil? user?)
-                                  (create (-> state :handlers :main) from)
+                                  (create (symbol disp/main-handler) from)
 
                                   (is-new-udata? user? from)
                                   (renew user? from)
 
                                   :else [user? []])
                is-payment?      (contains? (:message state) :successful_payment)
-               function         @(requiring-resolve ; TODO: rewrite more elegant
-                                  (if is-payment?
-                                    (-> state :handlers :payment)
-                                    (or (:callback/function callback?)
-                                        (-> state :handlers :main))))
+               function         @(if is-payment? disp/payment-handler
+                                     (or (disp/resolve-symbol! (:callback/function callback?))
+                                         disp/main-handler))
                arguments        (read-string (or (:callback/arguments callback?) "{}"))]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
-                                    (and (not=   (-> state :handlers :main)
+                                    (and (not=   (symbol disp/main-handler)
                                                  (:callback/function user-callback?))
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
-                                                               :callback/function (-> state :handlers :main)
+                                                               :callback/function (symbol disp/main-handler)
                                                                :callback/arguments (prn-str {})})
 
                                     :always (->

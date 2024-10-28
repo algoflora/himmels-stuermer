@@ -19,8 +19,6 @@
   :plugins [[jonase/eastwood "1.4.3"]
             [lein-ancient "1.0.0-RC3"]]
 
-  :clj-kondo {:config "./clj-kondo-config.edn"}
-
   :source-paths ["src"]
   :resource-paths ["resources"]
   :main ^:skip-aot himmelsstuermer.core
@@ -29,14 +27,20 @@
 
   :profiles {:dev {:dependencies [[lambdaisland/kaocha "1.91.1392"
                                    :exclusions [net.incongru.watchservice/barbary-watchservice]]]
-                   :source-paths ["src"]
+                   :source-paths ["src" "test"]
                    :resource-paths ["resources" "test/resources"]
                    :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
-                              "-Dhimmelsstuermer.profile=test"
-                              "--add-opens=java.base/java.nio=ALL-UNNAMED"
-                              "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}
-             :uberjar {:aot [himmelsstuermer.core]
+                              "-Dhimmelsstuermer.profile=test"]}
+             :uberjar {:aot :all
+                       :resource-paths ["resources"]
                        :uberjar-name "uberjar.jar"
                        :uberjar-exclusions ["himmelsstuermer.aws.*"]
-                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}}
-  :aliases {"test"   ["with-profile" "dev" "run" "-m" "kaocha.runner" "--fail-fast"]})
+                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
+             :analyze {:dependencies [[lambdaisland/kaocha "1.91.1392"
+                                       :exclusions [net.incongru.watchservice/barbary-watchservice]]]
+                       :source-paths ["test"]
+                       :resource-paths ["test/resources"]
+                       :uberjar-name "analyze.jar"
+                       :main himmelsstuermer.e2e-test}}
+  :aliases {"test"    ["with-profile" "dev" "run" "-m" "kaocha.runner" "--fail-fast"]
+            "analyze" ["with-profile" "analyze" "uberjar"]})

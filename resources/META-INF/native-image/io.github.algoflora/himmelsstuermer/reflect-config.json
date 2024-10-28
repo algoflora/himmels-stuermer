@@ -1,0 +1,11 @@
+[
+  {
+    "name": "clojure.lang.PersistentList",
+    "fields": [
+      {
+        "name": "creator",
+        "allowWrite": true
+      }
+    ]
+  }
+]

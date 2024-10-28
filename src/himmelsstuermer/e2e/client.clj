@@ -17,7 +17,7 @@
 (malli/=> send-update [:-> spec.tg/Update :any])
 
 
-(defn- send-update
+(defn send-update
   [data]
   (let [update      (assoc data :update_id (swap! update-id inc))
         mock-record (generate spec/Record)
@@ -25,16 +25,20 @@
                      :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
     (tt/event! ::send-update {:data {:update update :mock-data mock-data}})
     (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
-    ((requiring-resolve 'himmelsstuermer.core/-main))))
+    (himmelsstuermer.core/-main)))
 
 
 (malli/=> send-action-request [:-> spec/ActionRequest :any])
 
 
-(defn- send-action-request
+(defn send-action-request
   [action-request]
-  (let [handler (requiring-resolve 'himmelsstuermer.core/handler)]
-    (handler action-request)))
+  (let [mock-record (generate spec/Record)
+        mock-data   {:body (json/encode {:Records [(assoc mock-record :body (json/encode action-request))]})
+                     :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
+    (tt/event! ::send-action-request {:data {:update update :mock-data mock-data}})
+    (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
+    (himmelsstuermer.core/-main)))
 
 
 (malli/=> dummy-kw?->dummy [:-> [:or spec.tg/User :keyword] spec.tg/User])

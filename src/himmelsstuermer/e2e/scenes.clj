@@ -1,9 +1,9 @@
 (ns himmelsstuermer.e2e.scenes
   {:clj-kondo/config '{:ignore [:unused-private-var]}}
   (:require
-    [clojure.pprint :refer [pprint]]
     [clojure.string :as str]
     [clojure.test :refer [is testing]]
+    [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.logging :refer [throwable->map]]
     [himmelsstuermer.e2e.client :as cl]
     [himmelsstuermer.e2e.dummy :as dum]
@@ -29,7 +29,6 @@
   [dummy]
   (let [key   (-> dummy :username keyword)
         dummy (dum/get-by-key key)]
-    (println (format "Dumping dummy %s\n%s" key (with-out-str (pprint dummy))))
     (tt/event! ::dumping-dummy {:data {:dummy dummy}})))
 
 
@@ -252,10 +251,11 @@
                             [(keyword ns "click-btn") 1 "✖️"])))))
 
 
-(defn- call!
-  [_ f & args]
-  ;; TODO: Find out the way for database connection in such call
-  (apply (requiring-resolve f) args))
+;; TODO: Think how to be about requiring-resolve
+;; (defn- call!
+;;   [_ f & args]
+;;   ;; TODO: Find out the way for database connection in such call
+;;   (apply (requiring-resolve f) args))
 
 
 (defn- action!
@@ -345,12 +345,12 @@
                                  (vector? %)            [:inline %])
                               ~arg)]
            (System/setProperty "himmelsstuermer.test.database.id" (str (random-uuid)))
-           (with-redefs [himmelsstuermer.core.init/handler-main
+           (with-redefs [himmelsstuermer.core.dispatcher/main-handler
                          ~(if (some? h)
-                            `(m/sp
-                               (tt/event! ::init-handler-main-mock {:data {:symbol ~h}})
-                               {:handler/main ~h})
-                            `himmelsstuermer.core.init/handler-main)]
+                            `(do
+                               (tt/event! ::mock-main-handler {:data {:symbol ~h}})
+                               (resolve ~h))
+                            `himmelsstuermer.core.dispatcher/main-handler)]
              (binding [*clock* ~'a-clock]
                (situation ~'scenes)))
            (System/clearProperty "himmelsstuermer.test.database.id"))))))

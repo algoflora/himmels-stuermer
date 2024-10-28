@@ -1,6 +1,5 @@
 (ns himmelsstuermer.misc
   (:require
-    [clojure.edn :as edn]
     [clojure.java.io :as io]
     [clojure.string :as str]
     [missionary.core :as m]
@@ -46,7 +45,7 @@
         first))
 
 
-(defn- read-resource
+(defn read-resource
   [resource-url]
   (-> resource-url
       slurp

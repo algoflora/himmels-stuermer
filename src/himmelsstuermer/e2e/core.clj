@@ -2,22 +2,14 @@
   (:require
     [himmelsstuermer.e2e.client :as cl]
     [himmelsstuermer.e2e.dummy :as dum]
-    [himmelsstuermer.spec.telegram :as spec.tg]
-    [malli.core :as m]
+    [himmelsstuermer.e2e.serve :refer [set-serve-multimethod]]
     [taoensso.telemere :as tt]))
 
 
-(defmulti ^:private serve (fn [method _] method))
-
-(m/=> request [:=> [:cat :string :keyword spec.tg/Request] :any])
+(defmulti serve (fn [method _] method))
 
 
-(defn request
-  [_ method body]
-  (tt/event! ::request-received
-             {:data {:method method
-                     :body body}})
-  (serve method body))
+(set-serve-multimethod serve)
 
 
 (defmethod serve :sendMessage

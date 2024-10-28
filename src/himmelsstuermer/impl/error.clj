@@ -2,6 +2,7 @@
   (:require
     [himmelsstuermer.api :as api]
     [himmelsstuermer.api.buttons :as b]
+    [himmelsstuermer.core.dispatcher :refer [main-handler]]
     [himmelsstuermer.user :refer [has-role?]]
     [missionary.core :as m]))
 
@@ -23,4 +24,4 @@
   [{:keys [usr cbq] :as state}]
   (m/join (constantly (:txs state))
           (api/delete-message state usr (-> cbq :message :message_id))
-          ((requiring-resolve (:himmelsstuermer/main-handler state)) state)))
+          (main-handler state)))

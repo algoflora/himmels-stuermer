@@ -1,6 +1,6 @@
 FROM amazonlinux:2023
 
-ENV GRAALVM_VERSION=22.3.1
+ENV GRAALVM_VERSION=23
 ENV TARGET_ARCH=aarch64
 
 # Install necessary packages
@@ -12,13 +12,12 @@ RUN dnf install -y \
 
 # Install GraalVM
 
-ENV GRAALVM_FILENAME="graalvm-ce-java19-linux-${TARGET_ARCH}-${GRAALVM_VERSION}.tar.gz"
-RUN curl -Lo /graalvm.tar.gz "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${GRAALVM_VERSION}/${GRAALVM_FILENAME}" # "https://download.oracle.com/graalvm/23/latest/graalvm-jdk-23_linux-aarch64_bin.tar.gz"
+RUN curl -Lo /graalvm.tar.gz "https://download.oracle.com/graalvm/${GRAALVM_VERSION}/latest/graalvm-jdk-${GRAALVM_VERSION}_linux-${TARGET_ARCH}_bin.tar.gz"
 RUN mkdir /graalvm
 RUN tar -xzvf /graalvm.tar.gz -C /graalvm --strip-components=1
 ENV JAVA_HOME=/graalvm
 ENV PATH="/graalvm/bin:$PATH"
-RUN gu install native-image
+# RUN gu install native-image
 
 # Install Leiningen
 
@@ -43,11 +42,6 @@ RUN dnf clean all
 
 COPY . /app
 WORKDIR /app
-
-# Build uberjarNecessacy env vars
-
-ENV DTLV_COMPILE_NATIVE=true
-# ENV USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM=false
 
 # Run build script
 

@@ -2,6 +2,8 @@
   (:require
     [cheshire.core :refer [generate-string parse-string]]
     [himmelsstuermer.api.buttons :as b]
+    [himmelsstuermer.core.config :as conf]
+    [himmelsstuermer.e2e.serve]
     [himmelsstuermer.impl.buttons :as ib]
     [himmelsstuermer.impl.callbacks :as clb]
     [himmelsstuermer.impl.transactor :refer [transact! get-txs TransactionsStorage]]
@@ -43,7 +45,9 @@
 
 (defn api-task
   [state method data]
-  (m/sp (let [api-fn (:himmelsstuermer/api-fn state)
+  (m/sp (let [api-fn (case @conf/profile
+                       :test (resolve 'himmelsstuermer.e2e.serve/request)
+                       :aws  (resolve 'himmelsstuermer.impl.api/request))
               token  (-> state :bot :token)]
           (tt/event! ::calling-api-fn
                      {:data {:function api-fn

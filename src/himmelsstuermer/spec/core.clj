@@ -74,17 +74,11 @@
   [:map {:closed true}
    [:profile :keyword]
    [:system [:map {:closed true}
-             [:db-conn [:fn spec.dh/SConnection]]
-             [:api-fn fn?]]]
+             [:db-conn [:fn spec.dh/SConnection]]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
           [:roles [:map-of :keyword [:set [:or :int :string]]]]
           [:default-language-code :keyword]]]
-   [:actions [:map {:closed true}
-              [:namespace :symbol]]]
-   [:handlers [:map {:closed true}
-               [:main :symbol]
-               [:payment :symbol]]]
    [:project [:map {:closed true}
               [:group :string]
               [:name :string]
@@ -106,8 +100,6 @@
 
 (def UserState
   [:map ; Open because it will be merged with arguments
-   [:himmelsstuermer/api-fn fn?]
-   [:himmelsstuermer/main-handler :symbol]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
           [:roles [:map-of :keyword [:set [:or :int :string]]]]

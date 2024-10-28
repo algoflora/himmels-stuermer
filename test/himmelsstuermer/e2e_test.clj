@@ -1,6 +1,13 @@
 (ns himmelsstuermer.e2e-test
+  (:gen-class)
   (:require
-    [himmelsstuermer.e2e.scenes :refer [situation-run defscene]]))
+    [himmelsstuermer.e2e.scenes :refer [situation-run defscene]]
+    [kaocha.runner :as runner]))
+
+
+(defn -main
+  [& args]
+  (runner/-main))
 
 
 (defscene :users/main-message
@@ -62,7 +69,6 @@
    :user/click-btn "Button"
    :user/check-msg "Click Error" [["Error"]]
    :user/click-btn "Error"
-   ;; ::call! #(Thread/sleep 1000)
    :user/check-msg 1 "⚠️ Unexpected ERROR! ⚠️" [["To Main Menu"] ["✖️"]]
    :user/click-btn 1 "To Main Menu"
    :user/check-no-temp-messages

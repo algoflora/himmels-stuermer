@@ -1,5 +1,3 @@
 {:bot/token "0000000000:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
- :bot/roles {:admin ["admin"]}
-
- :handler/main himmelsstuermer.e2e-test.handler/main}
+ :bot/roles {:admin ["admin"]}}

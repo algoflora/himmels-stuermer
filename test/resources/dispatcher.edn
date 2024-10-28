@@ -1,0 +1,3 @@
+{:main-handler himmelsstuermer.e2e-test.handler/main
+
+ :handlers-namespaces [himmelsstuermer.e2e-test.handler]}

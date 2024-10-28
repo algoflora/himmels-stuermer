@@ -5,6 +5,7 @@
     [clojure.string :as str]
     [clojure.walk :refer [postwalk]]
     [datahike.api :as d]
+    [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
@@ -86,7 +87,7 @@
   [{:keys [action] :as state}]
   (m/sp (tt/event! ::handle-action {:data {:action action}})
         (let [arguments (:arguments action)
-              function  (requiring-resolve (symbol (-> state :actions :namespace str) (:method action)))]
+              function  @(disp/resolve-action! (symbol (:method action)))]
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
