@@ -26,7 +26,8 @@
   (reset! nano-timer (System/nanoTime)))
 
 
-(def console-event-id-handler
+(defn- console-event-id-handler
+  []
   (tt/handler:console
     {:output-fn
      (tt/pr-signal-fn {:pr-fn (ttu/format-signal-fn
@@ -34,7 +35,8 @@
                                  :content-fn (constantly nil)})})}))
 
 
-(def console-json-handler
+(defn- console-json-handler
+  []
   (tt/handler:console {:output-fn (tt/pr-signal-fn {:pr-fn json/encode})}))
 
 
@@ -81,31 +83,38 @@
     (malli/schema? obj) transform-malli-scheme))
 
 
+(defonce ^:private initialized? (atom false))
+
+
 (defn- shutdown-hook
   [& args]
+  (println "SHUTDOWN_HOOK")
   (tt/event! ::shutdown-hook {:data {:args args}})
-  (tt/stop-handlers!))
+  (tt/stop-handlers!)
+  (reset! initialized? false))
 
 
 (defn init-logging!
-  [project-info profile]
-  (tt/call-on-shutdown! shutdown-hook)
-  (tt/remove-handler! :default/console)
-  (when (= :aws profile)
-    (tt/add-handler! :console-json console-json-handler))
-  (when (= :test profile)
-    (tt/add-handler! :console-event-id console-event-id-handler)
-    ;; (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
-    (tt/add-handler! :file-edn-disposable (file-edn-disposable-handler)))
-  (tt/set-ctx! {:project project-info :profile profile})
-  (tt/set-middleware! (fn [signal]
-                        (let [signal' (prewalk walk signal)
-                              nt @nano-timer]
-                          (cond-> signal'
-                            (some? nt) (assoc-in [:data :millis-passed]
-                                                 (-> (System/nanoTime) (- nt) (* 0.000001)))))))
-  (let [handlers (tt/get-handlers)]
-    (tt/event! ::logging-initialized {:data {:handlers handlers}})))
-
-
-(init-logging! (misc/project-info) @conf/profile)
+  []
+  (when (false? @initialized?)
+    (let [profile @conf/profile
+          project-info (misc/project-info)]
+      (println "INIT_LOGGING!")
+      (tt/call-on-shutdown! shutdown-hook)
+      (tt/remove-handler! :default/console)
+      (when (= :aws profile)
+        (tt/add-handler! :console-json (console-json-handler)))
+      (when (= :test profile)
+        (tt/add-handler! :console-event-id (console-event-id-handler))
+        ;; (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
+        (tt/add-handler! :file-edn-disposable (file-edn-disposable-handler)))
+      (tt/set-ctx! {:project project-info :profile profile})
+      (tt/set-middleware! (fn [signal]
+                            (let [signal' (prewalk walk signal)
+                                  nt @nano-timer]
+                              (cond-> signal'
+                                (some? nt) (assoc-in [:data :millis-passed]
+                                                     (-> (System/nanoTime) (- nt) (* 0.000001)))))))
+      (reset! initialized? true)
+      (let [handlers (tt/get-handlers)]
+        (tt/event! ::logging-initialized {:data {:handlers handlers}})))))

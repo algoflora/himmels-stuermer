@@ -61,9 +61,6 @@
                (some-> dir io/resource res/url-dir)))))
 
 
-(m/? (read-resource-dir "schema"))
-
-
 (defmulti remove-nils (fn [x]
                         (cond
                           (record? x) :default

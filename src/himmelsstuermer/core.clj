@@ -6,7 +6,8 @@
     [clojure.walk :refer [postwalk]]
     [datahike.api :as d]
     [himmelsstuermer.core.dispatcher :as disp]
-    [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
+    [himmelsstuermer.core.init]
+    [himmelsstuermer.core.logging :refer [init-logging! reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
     [himmelsstuermer.impl.api :as api]
@@ -201,8 +202,18 @@
 
 (def invocations
   (m/seed (repeatedly (fn []
-                        @(http/get (str runtime-api-url "invocation/next")
-                                   {:timeout timeout-ms})))))
+                        (let [url (str runtime-api-url "invocation/next")]
+                          (tt/event! ::invocation-next-request {:data {:url url
+                                                                       :timeout timeout-ms}})
+                          (let [resp @(http/get url
+                                                {:timeout timeout-ms})]
+                            (when (:error resp)
+                              (let [exc     (:error resp)
+                                    exc-map (throwable->map exc)]
+                                (throw (tt/error! {:id ::invocation-next-error
+                                                   :data exc-map} exc))))
+                            (tt/event! ::invocation-next-response {:data {:response resp}})
+                            resp))))))
 
 
 (def requests
@@ -242,5 +253,7 @@
 
 
 (defn -main
-  [& _]
+  [& args]
+  (init-logging!)
+  (tt/event! ::start-main {:data {:main "-main"}})
   (m/? (m/reduce conj app)))

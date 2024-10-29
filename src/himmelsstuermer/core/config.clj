@@ -26,6 +26,7 @@
     (let [profile @profile
           cfg (read-config (io/resource "himmelsstuermer-resources/config.edn")
                            {:profile profile})]
+      (println "HS_CONF\t" cfg)
       (tt/event! ::himmelsstuermer-config-file-loaded {:data {:profile profile
                                                               :config cfg}})
       cfg)))
@@ -47,8 +48,8 @@
 
 
 (defn- merge-configs
-  [hh-cfg cfg]
-  (merge hh-cfg cfg))
+  [hs-cfg cfg]
+  (merge hs-cfg cfg))
 
 
 (def config

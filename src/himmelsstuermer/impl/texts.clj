@@ -5,9 +5,9 @@
 
 
 (def ^:private texts
-  (into {} (->> (m/? (read-resource-dir "texts")) ; TODO: Think about wrapping all this to tasks
-                (map #(into {} [%]))
-                (apply merge)))) ; TODO: Think about moving this to state
+  (delay (into {} (->> (m/? (read-resource-dir "texts")) ; TODO: Think about wrapping all this to tasks
+                       (map #(into {} [%]))
+                       (apply merge))))) ; TODO: Think about moving this to state
 
 
 (defmulti txti (fn [_ path & _] (seqable? path)))
@@ -24,7 +24,7 @@
         [path# form] (if (-> path last int?)
                        [(->> path (drop-last 1) vec) (last path)]
                        [(vec path) 0])
-        lang-map (get-in texts path#)]
+        lang-map (get-in @texts path#)]
     (when (not (map? lang-map))
       (throw (ex-info "Not a map in texts by given path!"
                       {:event ::no-text-map-on-path :path path :lang-map lang-map})))

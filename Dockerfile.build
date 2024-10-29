@@ -32,11 +32,31 @@ RUN dnf install -y \
     gcc \
     glibc-devel \
     # java-23-amazon-corretto-devel \
+    git \
+    readline-devel \
+    autoconf \
     zlib-devel \
     libstdc++-static
 
 RUN dnf clean all
 
+# Install rlwrap
+
+RUN curl -Lo rlwrap.tar.gz https://github.com/hanslub42/rlwrap/releases/download/0.46.1/rlwrap-0.46.1.tar.gz
+RUN mkdir /rlwrap
+RUN tar -xzvf rlwrap.tar.gz -C /rlwrap --strip-components=1
+WORKDIR /rlwrap
+RUN ./configure;
+RUN make
+RUN make check
+RUN make install
+WORKDIR /
+
+# Install Clojure
+
+RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh
+RUN chmod +x linux-install.sh
+RUN ./linux-install.sh
 
 # Copy project
 

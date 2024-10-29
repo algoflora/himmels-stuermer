@@ -1,4 +1,5 @@
-{:db/conn #profile {:aws  "/mnt/efs/dtlv"
+{:db/conf #profile {:aws  #_{:backend :mem :id "docker"} {:backend  :file
+                                                          :path     "./dthk" #_"/mnt/efs/dtlv"}
                     :test nil}
 
  :bot/default-language-code :en

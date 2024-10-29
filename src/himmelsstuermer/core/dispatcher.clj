@@ -1,5 +1,4 @@
 (ns himmelsstuermer.core.dispatcher
-  (:gen-class)
   (:require
     [clojure.java.io :as io]
     [himmelsstuermer.core.logging]
@@ -8,6 +7,7 @@
     [taoensso.telemere :as tt]))
 
 
+;; TODO: Move dispatcher to missionary tasks? Then we can do logging here...
 (def ^:private dispatcher-config
   (some-> "dispatcher.edn"
           io/resource
@@ -19,19 +19,19 @@
 
 
 (doseq [ns handlers-namespaces]
-  (tt/event! ::require-namespace {:data {:namespace ns}})
+  ;; (tt/event! ::require-namespace {:data {:namespace ns}})
   (require (symbol ns)))
 
 
 (def main-handler
   (let [sym (or (:main-handler dispatcher-config) 'himmelsstuermer.handler/main)]
-    (tt/event! ::init-main-handler {:data {:symbol sym}})
+    ;; (tt/event! ::init-main-handler {:data {:symbol sym}})
     (resolve sym)))
 
 
 (def payment-handler
   (let [sym (or (:payment-handler dispatcher-config) 'himmelsstuermer.handler/payment)]
-    (tt/event! ::init-payment-handler {:data {:symbol sym}})
+    ;; (tt/event! ::init-payment-handler {:data {:symbol sym}})
     (resolve sym)))
 
 
@@ -39,7 +39,7 @@
   (or (:actions-namespace dispatcher-config) 'himmelsstuermer.actions))
 
 
-(tt/event! ::require-actions-namespace {:data {:namespace actions-namespace}})
+;; (tt/event! ::require-actions-namespace {:data {:namespace actions-namespace}})
 (require actions-namespace)
 
 

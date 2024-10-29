@@ -21,15 +21,14 @@
                             {:backend  :mem
                              :id       (System/getProperty "himmelsstuermer.test.database.id"
                                                            (str (random-uuid)))})
+              _ (println "CONF:\t" (m/? conf/config))
               schema    (m/? (m/join (fn [init & more]
                                        (into init cat more))
                                      himmelsstuermer-schema
                                      (read-resource-dir "schema")))
               opts      {:store              store-cfg
                          :schema-flexibility :write
-                         :index              ({:mem :datahike.index/persistent-set}
-                                              (:backend store-cfg)
-                                              :datahike.index/hitchhiker-tree)
+                         :index              :datahike.index/persistent-set
                          :keep-history?      true
                          :attribute-refs?    false
                          :initial-tx         schema}
@@ -37,7 +36,7 @@
               conn      (do (when-not (d/database-exists? {:store store-cfg})
                               (let [db (d/create-database opts)]
                                 (tt/event! ::database-created {:data {:database db}})))
-                            (d/connect {:store store-cfg}))]
+                            (d/connect opts))]
           (tt/event! ::init-db-conn {:data {:store-config store-cfg
                                             :options opts
                                             :connection conn}})
@@ -87,3 +86,73 @@
   (m/sp (let [cfg (:project/config (m/? conf/config))]
           (tt/event! ::init-project-config {:data {:config cfg}})
           {:project/config cfg})))
+
+
+;; [{:db/ident :user/uuid
+;;   :db/valueType :db.type/uuid
+;;   :db/cardinality :db.cardinality/one
+;;   :db/unique :db.unique/identity
+;;   :db/doc "UUID of User"}
+
+;;  {:db/ident :user/username
+;;   :db/valueType :db.type/string
+;;   :db/cardinality :db.cardinality/one
+;;   :db/unique :db.unique/identity
+;;   :db/doc "User's Telegram username"}
+
+;;  {:db/ident :user/id
+;;   :db/valueType :db.type/long
+;;   :db/cardinality :db.cardinality/one
+;;   :db/unique :db.unique/identity
+;;   :db/doc "User's Telegram ID (and chat_id in private chats)"}
+
+;;  {:db/ident :user/first-name
+;;   :db/valueType :db.type/string
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "User's first name in Telegram profile"}
+
+;;  {:db/ident :user/last-name
+;;   :db/valueType :db.type/string
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "User's last name in Telegram profile"}
+
+;;  {:db/ident :user/language-code
+;;   :db/valueType :db.type/string
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "User's language code in Telegram profile"}
+
+;;  {:db/ident :user/msg-id
+;;   :db/valueType :db.type/long
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "ID of 'main' chat message for this User"}
+
+;;  {:db/ident :callback/uuid
+;;   :db/valueType :db.type/uuid
+;;   :db/cardinality :db.cardinality/one
+;;   :db/unique :db.unique/identity
+;;   :db/doc "UUID of Callback"}
+
+;;  {:db/ident :callback/function
+;;   :db/valueType :db.type/symbol
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "Qualified symbol of function of Callback"}
+
+;;  {:db/ident :callback/arguments
+;;   :db/valueType :db.type/string
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "EDN-serialized arguments of Callback"}
+
+;;  {:db/ident :callback/user
+;;   :db/valueType :db.type/ref
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "The User for whom this Callbak is intended"}
+
+;;  {:db/ident :callback/service?
+;;   :db/valueType :db.type/boolean
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "Indicates is this callback a service one. If `true` then User's Callback will not reset."}
+
+;;  {:db/ident :callback/message-id
+;;   :db/valueType :db.type/long
+;;   :db/cardinality :db.cardinality/one
+;;   :db/doc "ID of Message this Callback is associated with"}]

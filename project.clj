@@ -31,16 +31,43 @@
                    :resource-paths ["resources" "test/resources"]
                    :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
                               "-Dhimmelsstuermer.profile=test"]}
-             :uberjar {:aot :all
-                       :resource-paths ["resources"]
-                       :uberjar-name "uberjar.jar"
-                       :uberjar-exclusions ["himmelsstuermer.aws.*"]
-                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}
-             :analyze {:dependencies [[lambdaisland/kaocha "1.91.1392"
+
+             :native  {:aot [datahike.api datahike.api.impl datahike.api.specification datahike.array datahike.cli datahike.config datahike.connections datahike.connector datahike.constants datahike.core datahike.datom datahike.db datahike.db.interface datahike.db.search datahike.db.transaction datahike.db.utils datahike.experimental.gc datahike.experimental.versioning datahike.http.client datahike.http.writer datahike.impl.entity datahike.index datahike.index.hitchhiker-tree datahike.index.hitchhiker-tree.insert datahike.index.hitchhiker-tree.upsert datahike.index.interface datahike.index.persistent-set datahike.index.utils datahike.integration-test datahike.json datahike.lru datahike.middleware.query datahike.middleware.utils datahike.migrate datahike.norm.norm datahike.pod datahike.pull-api datahike.query datahike.query-stats datahike.readers datahike.remote datahike.schema datahike.spec datahike.store datahike.tools datahike.transit datahike.writer datahike.writing
+                             himmelsstuermer.core
+                             himmelsstuermer.api
+                             himmelsstuermer.api.buttons
+                             himmelsstuermer.api.texts
+                             ;; himmelsstuermer.api.transactor
+                             himmelsstuermer.core.config
+                             himmelsstuermer.core.dispatcher
+                             himmelsstuermer.core.init
+                             himmelsstuermer.core.logging
+                             ;; himmelsstuermer.core.state
+                             ;; himmelsstuermer.core.user
+                             himmelsstuermer.impl.api
+                             himmelsstuermer.impl.buttons
+                             himmelsstuermer.impl.callbacks
+                             ;; himmelsstuermer.impl.error
+                             ;; himmelsstuermer.impl.texts
+                             himmelsstuermer.impl.transactor
+                             himmelsstuermer.handler
+                             himmelsstuermer.misc
+                             ;; himmelsstuermer.user
+                             ]
+                       :uberjar-exclusions ["himmelsstuermer.e2e.*"
+                                            "himmelsstuermer.aws.*"]
+                       :uberjar-name "native.jar"
+                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+                       :main himmelsstuermer.core}
+
+             :analyze {:aot :all
+                       :dependencies [[lambdaisland/kaocha "1.91.1392"
                                        :exclusions [net.incongru.watchservice/barbary-watchservice]]]
                        :source-paths ["test"]
                        :resource-paths ["test/resources"]
+                       :uberjar-exclusions ["himmelsstuermer.aws.*"]
                        :uberjar-name "analyze.jar"
                        :main himmelsstuermer.e2e-test}}
   :aliases {"test"    ["with-profile" "dev" "run" "-m" "kaocha.runner" "--fail-fast"]
-            "analyze" ["with-profile" "analyze" "uberjar"]})
+            "analyze" ["with-profile" "analyze" "uberjar"]
+            "native"  ["with-profile" "native" "uberjar"]})
