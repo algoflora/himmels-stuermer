@@ -88,7 +88,6 @@
 
 (defn- shutdown-hook
   [& args]
-  (println "SHUTDOWN_HOOK")
   (tt/event! ::shutdown-hook {:data {:args args}})
   (tt/stop-handlers!)
   (reset! initialized? false))
@@ -99,7 +98,6 @@
   (when (false? @initialized?)
     (let [profile @conf/profile
           project-info (misc/project-info)]
-      (println "INIT_LOGGING!")
       (tt/call-on-shutdown! shutdown-hook)
       (tt/remove-handler! :default/console)
       (when (= :aws profile)

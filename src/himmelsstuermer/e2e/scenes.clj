@@ -12,7 +12,6 @@
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
-    [missionary.core :as m]
     [taoensso.telemere :as tt]
     [tick.core :as t]))
 
@@ -22,7 +21,7 @@
 
 (defn- str?->re
   [re?]
-  (if (string? re?) (re-pattern (java.util.regex.Pattern/quote re?)) re?))
+  (if (string? re?) (re-pattern (str "^" (java.util.regex.Pattern/quote re?) "$")) re?))
 
 
 (defn- dump
@@ -182,7 +181,7 @@
       (is (f v1 v2)))))
 
 
-(defn- check-no-temp-messages
+(defn- check-no-modal-messages
   [dummy]
   (let [m-msg (get-message dummy nil)
         t-msg (get-message dummy 1)]
@@ -235,15 +234,15 @@
     (sub-scene nil blueprint)))
 
 
-(defn- check-and-close-only-temp
+(defn- check-and-close-only-modal
   [dummy & args]
   (let [ns (:username dummy)]
     (sub-scene dummy
                (vec (concat [(keyword ns "check-msg") 1] args
-                            [(keyword ns "click-btn") 1 "✖️" (keyword ns "check-no-temp-messages")])))))
+                            [(keyword ns "click-btn") 1 "✖️" (keyword ns "check-no-modal-messages")])))))
 
 
-(defn- check-and-close-last-temp
+(defn- check-and-close-last-modal
   [dummy & args]
   (let [ns (:username dummy)]
     (sub-scene dummy

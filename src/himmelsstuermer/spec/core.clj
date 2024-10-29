@@ -80,9 +80,7 @@
           [:roles [:map-of :keyword [:set [:or :int :string]]]]
           [:default-language-code :keyword]]]
    [:project [:map {:closed true}
-              [:group :string]
               [:name :string]
-              [:version :string]
               [:config :map]]]
    [:database [:maybe [:fn spec.dh/SDB]]]
    [:action [:maybe Action]]

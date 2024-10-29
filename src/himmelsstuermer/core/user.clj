@@ -23,7 +23,7 @@
 
 (defn- renew
   [user udata]
-  (let [user' (assoc user ; TODO: Attempt to minimize transaction data
+  (let [user' (assoc user ; TODO: Atmodalt to minimize transaction data
                      :user/username (:usernam udata)
                      :user/first-name (:first_name udata)
                      :user/last-name (:last_name udata)
@@ -107,8 +107,9 @@
                arguments        (read-string (or (:callback/arguments callback?) "{}"))]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
-                                    (and (not=   (symbol disp/main-handler)
-                                                 (:callback/function user-callback?))
+                                    (and (or (not=   (symbol disp/main-handler)
+                                                     (:callback/function user-callback?))
+                                             (seq (read-string (:callback/arguments user-callback?))))
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
                                                                :callback/function (symbol disp/main-handler)

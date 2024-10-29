@@ -69,11 +69,11 @@
 
 
 (defn prepare-keyboard
-  [state kbd user temp?]
+  [state kbd user modal?]
   (when kbd
     {:inline_keyboard
      (cond-> (mapv (fn [btns] (mapv #(b/to-map % state user) btns)) kbd)
-       temp? (conj [(b/to-map (ib/->XButton) state user)]))}))
+       modal? (conj [(b/to-map (ib/->XButton) state user)]))}))
 
 
 (defn- set-callbacks-message-id
@@ -93,7 +93,7 @@
   (when (and (some? (:user/msg-id user)) (= (:message-id options) (:user/msg-id user)))
     (throw (ex-info "Manual editing of Main Message is forbidden!"
                     {:event ::manual-main-message-edit-error})))
-  (if (:temp options)
+  (if (:modal options)
     (some? (:message-id options))
     (pos-int? (:user/msg-id user))))
 
@@ -230,7 +230,7 @@
                                                  :body body
                                                  :new-msg new-msg
                                                  :new-message-id new-msg-id}})
-          (when (and (not (:temp options)) (not= new-msg-id (:msg-id user)))
+          (when (and (not (:modal options)) (not= new-msg-id (:msg-id user)))
             (tt/event! ::set-user-msg-id {:data {:message new-msg
                                                  :message-id new-msg-id}})
             (transact! txs [[:db/add (:db/id user) :user/msg-id new-msg-id]]))
@@ -248,7 +248,7 @@
                :reply_markup (prepare-keyboard
                                state
                                (->> args (filter vector?) first misc/remove-nils)
-                               user (boolean (some #{:temp} opts)))
+                               user (boolean (some #{:modal} opts)))
                :entities     (->> args (filter set?) first vec)}
      :options (into {:message-id (->> args (filter int?) first)}
                     (map #(vector % true) opts))}))
@@ -261,7 +261,7 @@
                                           state
                                           (into [[(b/pay-btn text)]] kbd)
                                           user true)})
-    :options {:temp true}}))
+    :options {:modal true}}))
 
 
 (malli/=> send! [:=> [:cat :keyword spec/UserState spec/User [:* :any]] spec/MissionaryTask])

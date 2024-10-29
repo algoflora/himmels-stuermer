@@ -21,9 +21,10 @@
 (defmethod txti true
   [state lang path & args]
   (let [default-lang (-> state :bot :default-language-code)
-        [path# form] (if (-> path last int?)
-                       [(->> path (drop-last 1) vec) (last path)]
-                       [(vec path) 0])
+        path' (if (sequential? path) path [path])
+        [path# form] (if (-> path' last int?)
+                       [(->> path' (drop-last 1) vec) (last path')]
+                       [(vec path') 0])
         lang-map (get-in @texts path#)]
     (when (not (map? lang-map))
       (throw (ex-info "Not a map in texts by given path!"

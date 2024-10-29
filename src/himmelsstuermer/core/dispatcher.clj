@@ -3,8 +3,7 @@
     [clojure.java.io :as io]
     [himmelsstuermer.core.logging]
     [himmelsstuermer.handler]
-    [himmelsstuermer.misc :as misc]
-    [taoensso.telemere :as tt]))
+    [himmelsstuermer.misc :as misc]))
 
 
 ;; TODO: Move dispatcher to missionary tasks? Then we can do logging here...

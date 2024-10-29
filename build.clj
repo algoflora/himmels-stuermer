@@ -38,4 +38,5 @@
               :class-dir class-dir
               :lib lib
               :version version
-              :jar-file jar-file}))
+              :jar-file jar-file})
+  (println (str lib ":" version)))

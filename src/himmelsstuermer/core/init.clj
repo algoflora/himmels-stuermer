@@ -21,7 +21,6 @@
                             {:backend  :mem
                              :id       (System/getProperty "himmelsstuermer.test.database.id"
                                                            (str (random-uuid)))})
-              _ (println "CONF:\t" (m/? conf/config))
               schema    (m/? (m/join (fn [init & more]
                                        (into init cat more))
                                      himmelsstuermer-schema

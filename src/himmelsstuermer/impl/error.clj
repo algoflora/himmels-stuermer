@@ -14,7 +14,7 @@
                          (if (has-role? state :admin usr)
                            (str "\n\n" (ex-message exc)) ""))
                     [[(b/text-btn "To Main Menu" 'delete-and-home)]]
-                    :temp))
+                    :modal))
 
 
 (defn delete-and-home

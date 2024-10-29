@@ -31,7 +31,7 @@
 
   | option      | description | comment |
   |-------------|-------------|---------|
-  | `:temp`     | Sends 'temporal' message that appears with notification under 'main' one. This message will have button to delete it in the end | |
+  | `:modal`     | Sends 'modaloral' message that appears with notification under 'main' one. This message will have button to delete it in the end | |
   | `:markdown` | Messsage will use Markdown parse_mode | |"
 
   {:changed "0.1.0"}
@@ -42,7 +42,7 @@
 
 ;; (defn send-photo
 
-;;   "Sends photo message with picture from java.io.File in `file` as a temporary message with caption `caption` and inline keyboard `kbd` to `user`.
+;;   "Sends photo message with picture from java.io.File in `file` as a modalorary message with caption `caption` and inline keyboard `kbd` to `user`.
 ;;   Possible `opts`:
 
 ;;   | option      | description |
@@ -53,12 +53,12 @@
 ;;   {:added "0.1.0"}
 
 ;;   [user file caption kbd & opts]
-;;   (apply impl/prepare-and-send :photo user {:file file :caption caption} kbd :temp opts))
+;;   (apply impl/prepare-and-send :photo user {:file file :caption caption} kbd :modal opts))
 
 
 ;; (defn send-document
 
-;;   "Sends java.io.File in `file` as a temporary message with caption `caption` and inline keyboard `kbd` to `user`.
+;;   "Sends java.io.File in `file` as a modalorary message with caption `caption` and inline keyboard `kbd` to `user`.
 ;;   Possible `opts`:
 
 ;;   | option      | description | comment |
@@ -69,12 +69,12 @@
 ;;   {:added "0.1.0"}
 
 ;;   [user file caption kbd & opts]
-;;   (apply impl/prepare-and-send :document user {:file file :caption caption} kbd :temp opts))
+;;   (apply impl/prepare-and-send :document user {:file file :caption caption} kbd :modal opts))
 
 
 (defn send-invoice
 
-  "Sends invoice as 'temporal' message with inline keyboard `kbd` to `user`. Keyboard will have payment button with `text` in the beginning and button to delete it in the end.
+  "Sends invoice as 'modaloral' message with inline keyboard `kbd` to `user`. Keyboard will have payment button with `text` in the beginning and button to delete it in the end.
   Description of `data` map (all keys required):
 
   | key               | description |

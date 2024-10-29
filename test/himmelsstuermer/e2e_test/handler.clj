@@ -14,7 +14,7 @@
     (api/send-message state usr
                       (format "Hi, %s!" text)
                       [[(b/text-btn "Go!" 'go {:text text})]
-                       [(b/text-btn "Temp" 'temp)]])))
+                       [(b/text-btn "Temp" 'modal)]])))
 
 
 (defn go
@@ -22,11 +22,11 @@
   (api/send-message state usr (format "Go, %s!" text) [[(b/home-btn "Home")]]))
 
 
-(defn temp
+(defn modal
   [{:keys [usr] :as state}]
   (api/send-message state usr
                     (format "Temp message of %s" (-> usr :user/first-name str/capitalize))
-                    [] :temp))
+                    [] :modal))
 
 
 (defn store

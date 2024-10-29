@@ -150,7 +150,7 @@
   [state tx-set]
   (m/via m/blk
          (tt/event! ::persisting-data {:data {:tx-set tx-set}})
-         (d/transact (-> state :system :db-conn) (seq tx-set))))
+         (d/transact (-> state :system :db-conn) (vec tx-set))))
 
 
 (defn- execute-business-logic
@@ -168,10 +168,11 @@
                   (if fallback?
                     (throw (tt/error! {:id   ::fatal-error
                                        :data exc-map} exc))
-                    (let [fallback-task (err/handle-error (s/construct-user-state state)
+                    (let [_ (tt/error! {:id   ::business-logic-error
+                                        :data exc-map} exc)
+                          fallback-task (err/handle-error (s/construct-user-state state)
                                                           exc)]
-                      (tt/error! {:id   ::business-logic-error
-                                  :data exc-map} exc)
+
                       (m/? (execute-business-logic state #{fallback-task} true))))))))))
 
 

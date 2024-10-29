@@ -16,18 +16,18 @@
    :mary/send-text "Mary"
    :mary/check-msg "Hi, Mary!" [["Go!"] ["Temp"]]
    :ivan/click-btn #"^Go"
-   :mary/click-btn "Go"
+   :mary/click-btn "Go!"
    :mary/check-msg "Go, Mary!" #{} [["Home"]]
    :ivan/check-msg "Go, Ivan!" [["Home"]]
    :ivan/click-btn "Home"
    :mary/click-btn "Home"
-   :ivan/check-msg "Hi, stranger!" [["Go"] ["Temp"]]
-   :mary/check-msg #"stranger" #{} [["Go"] ["Temp"]]])
+   :ivan/check-msg "Hi, stranger!" [["Go!"] ["Temp"]]
+   :mary/check-msg #"stranger" #{} [["Go!"] ["Temp"]]])
 
 
-(defscene :users/temp-message
-  [:ivan/check-msg "Hi, stranger!" [["Go"] ["Temp"]]
-   :mary/check-msg "Hi, stranger!" [["Go"] ["Temp"]]
+(defscene :users/modal-message
+  [:ivan/check-msg "Hi, stranger!" [["Go!"] ["Temp"]]
+   :mary/check-msg "Hi, stranger!" [["Go!"] ["Temp"]]
    :mary/click-btn "Temp"
    :ivan/click-btn "Temp"
    :mary/click-btn "Temp"
@@ -71,7 +71,7 @@
    :user/click-btn "Error"
    :user/check-msg 1 "⚠️ Unexpected ERROR! ⚠️" [["To Main Menu"] ["✖️"]]
    :user/click-btn 1 "To Main Menu"
-   :user/check-no-temp-messages
+   :user/check-no-modal-messages
    :user/check-msg "Hello World!" [["Button"]]])
 
 
@@ -82,11 +82,11 @@
    :user/check-invoice "Invoice" "All your money!" "XTR" [{:label "Price" :amount 15000} {:label "Discount" :amount -5000}] [["Pay 100 XTR"] ["Dummy button"] ["✖️"]]
    :user/pay-invoice
    :user/approve-pre-checkout-query
-   :user/check-and-close-only-temp "Successful payment with payload all-your-money"])
+   :user/check-and-close-only-modal "Successful payment with payload all-your-money"])
 
 
 (situation-run Core
-               [:users/main-message :users/temp-message])
+               [:users/main-message :users/modal-message])
 
 
 (situation-run DB
