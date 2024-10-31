@@ -1,4 +1,4 @@
-(defproject io.github.algoflora/himmelsstuermer "0.1.0"
+(defproject io.github.algoflora/himmelsstuermer "0.1.3"
   :description "Himmelsstuermer - A framework for complex Telegram Bots development"
   :url "http://example.com/FIXME"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
@@ -13,11 +13,15 @@
                  [metosin/malli "0.16.4"]
                  [missionary "b.40"]
                  [org.clojure/clojure "1.12.0"]
-                 [resauce "0.2.0"]
-                 [tick/tick "1.0"]]
+                 [tick/tick "1.0"]
+                 [lambdaisland/kaocha "1.91.1392"
+                  :exclusions [net.incongru.watchservice/barbary-watchservice]]]
 
   :plugins [[jonase/eastwood "1.4.3"]
-            [lein-ancient "1.0.0-RC3"]]
+            [lein-ancient "1.0.0-RC3"]
+            [io.taylorwood/lein-native-image "0.3.1"]]
+
+  :native-image {:name "himmelsstuermer-native"}
 
   :source-paths ["src"]
   :resource-paths ["resources"]
@@ -25,49 +29,22 @@
 
   :target-path "target/%s"
 
-  :profiles {:dev {:dependencies [[lambdaisland/kaocha "1.91.1392"
-                                   :exclusions [net.incongru.watchservice/barbary-watchservice]]]
-                   :source-paths ["src" "test"]
-                   :resource-paths ["resources" "test/resources"]
-                   :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
-                              "-Dhimmelsstuermer.profile=test"]}
+  :profiles {:test      {:source-paths ["src" "test"]
+                         :resource-paths ["resources" "test/resources"]
+                         :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
+                                    "-Dhimmelsstuermer.profile=test"]}
 
-             :native  {:aot [datahike.api datahike.api.impl datahike.api.specification datahike.array datahike.cli datahike.config datahike.connections datahike.connector datahike.constants datahike.core datahike.datom datahike.db datahike.db.interface datahike.db.search datahike.db.transaction datahike.db.utils datahike.experimental.gc datahike.experimental.versioning datahike.http.client datahike.http.writer datahike.impl.entity datahike.index datahike.index.hitchhiker-tree datahike.index.hitchhiker-tree.insert datahike.index.hitchhiker-tree.upsert datahike.index.interface datahike.index.persistent-set datahike.index.utils datahike.integration-test datahike.json datahike.lru datahike.middleware.query datahike.middleware.utils datahike.migrate datahike.norm.norm datahike.pod datahike.pull-api datahike.query datahike.query-stats datahike.readers datahike.remote datahike.schema datahike.spec datahike.store datahike.tools datahike.transit datahike.writer datahike.writing
-                             himmelsstuermer.core
-                             himmelsstuermer.api
-                             himmelsstuermer.api.buttons
-                             himmelsstuermer.api.texts
-                             ;; himmelsstuermer.api.transactor
-                             himmelsstuermer.core.config
-                             himmelsstuermer.core.dispatcher
-                             himmelsstuermer.core.init
-                             himmelsstuermer.core.logging
-                             ;; himmelsstuermer.core.state
-                             ;; himmelsstuermer.core.user
-                             himmelsstuermer.impl.api
-                             himmelsstuermer.impl.buttons
-                             himmelsstuermer.impl.callbacks
-                             ;; himmelsstuermer.impl.error
-                             ;; himmelsstuermer.impl.texts
-                             himmelsstuermer.impl.transactor
-                             himmelsstuermer.handler
-                             himmelsstuermer.misc
-                             ;; himmelsstuermer.user
-                             ]
-                       :uberjar-exclusions ["himmelsstuermer.e2e.*"
-                                            "himmelsstuermer.aws.*"]
-                       :uberjar-name "native.jar"
-                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
-                       :main himmelsstuermer.core}
+             :uber      {:main himmelsstuermer.core
+                         :aot :all #_[himmelsstuermer.core]
+                         :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+                         :uberjar-name "himmelsstuermer.jar"}
 
-             :analyze {:aot :all
-                       :dependencies [[lambdaisland/kaocha "1.91.1392"
-                                       :exclusions [net.incongru.watchservice/barbary-watchservice]]]
-                       :source-paths ["test"]
-                       :resource-paths ["test/resources"]
-                       :uberjar-exclusions ["himmelsstuermer.aws.*"]
-                       :uberjar-name "analyze.jar"
-                       :main himmelsstuermer.e2e-test}}
-  :aliases {"test"    ["with-profile" "dev" "run" "-m" "kaocha.runner" "--fail-fast"]
-            "analyze" ["with-profile" "analyze" "uberjar"]
-            "native"  ["with-profile" "native" "uberjar"]})
+             :uber-test {:main himmelsstuermer.test-runner
+                         :aot [himmelsstuermer.test-runner]
+                         :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+                         :uberjar-name "himmelsstuermer-test.jar"}
+
+             :native    {:dependencies [[com.github.clj-easy/graal-build-time "1.0.5"]]
+                         :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}}
+
+  :aliases {"test" ["with-profile" "+test" "run" "-m" "himmelsstuermer.test-runner/kaocha" "--fail-fast"]})

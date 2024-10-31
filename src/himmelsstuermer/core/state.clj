@@ -65,7 +65,8 @@
     (merge base-map (:arguments state))))
 
 
-(def state
+(defn state
+  []
   (m/sp (let [profile @conf/profile]
           (when (Boolean/parseBoolean (System/getProperty "himmelsstuermer.malli.instrument"))
             (tt/event! ::malli-instrument-run)

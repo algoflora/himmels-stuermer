@@ -8,10 +8,11 @@
 (defonce ^:private serve-multimethod (atom nil))
 
 
-(defn set-serve-multimethod
+(defn set-serve-multimethod!
   [mm]
-  (tt/event! ::set-serve-multimethod {:data {:multimethod mm}})
-  (reset! serve-multimethod mm))
+  (when (nil? @serve-multimethod)
+    (tt/event! ::set-serve-multimethod {:data {:multimethod mm}})
+    (reset! serve-multimethod mm)))
 
 
 (malli/=> request [:=> [:cat :string :keyword spec.tg/Request] :any])
@@ -21,5 +22,6 @@
   [_ method body]
   (tt/event! ::request-received
              {:data {:method method
-                     :body body}})
+                     :body body
+                     :serve-multimethod @serve-multimethod}})
   (@serve-multimethod method body))

@@ -2,8 +2,7 @@
   (:require
     [clojure.java.io :as io]
     [clojure.string :as str]
-    [missionary.core :as m]
-    [resauce.core :as res]))
+    [missionary.core :as m]))
 
 
 (defn dbg
@@ -46,22 +45,6 @@
         (map (caller-map-fn ~(str *ns*)))
         (filter some?)
         first))
-
-
-(defn read-resource
-  [resource-url]
-  (-> resource-url
-      slurp
-      read-string))
-
-
-(defn read-resource-dir
-  ([dir] (read-resource-dir dir "edn"))
-  ([dir ext]
-   (m/sp (into []
-               (comp (filter #(str/ends-with? % (str "." ext)))
-                     (mapcat read-resource))
-               (some-> dir io/resource res/url-dir)))))
 
 
 (defmulti remove-nils (fn [x]

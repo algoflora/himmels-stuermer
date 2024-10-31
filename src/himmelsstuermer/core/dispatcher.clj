@@ -1,16 +1,17 @@
 (ns himmelsstuermer.core.dispatcher
   (:require
+    [clojure.core.server]
     [clojure.java.io :as io]
-    [himmelsstuermer.core.logging]
-    [himmelsstuermer.handler]
-    [himmelsstuermer.misc :as misc]))
+    ;; [himmelsstuermer.core.logging]
+    [himmelsstuermer.handler]))
 
 
 ;; TODO: Move dispatcher to missionary tasks? Then we can do logging here...
 (def ^:private dispatcher-config
   (some-> "dispatcher.edn"
           io/resource
-          misc/read-resource))
+          slurp
+          read-string))
 
 
 (def ^:private handlers-namespaces

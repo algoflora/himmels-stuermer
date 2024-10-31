@@ -4,27 +4,26 @@
     [clojure.java.io :as io]
     [datahike.api :as d]
     [himmelsstuermer.core.config :as conf]
-    [himmelsstuermer.misc :refer [read-resource-dir]]
     [missionary.core :as m]
     [taoensso.telemere :as tt]))
 
 
 (def ^:private himmelsstuermer-schema
-  (m/sp (-> "himmelsstuermer-resources/schema.edn"
-            io/resource
-            slurp
-            edn/read-string)))
+  (-> "himmelsstuermer.schema.edn"
+      io/resource
+      slurp
+      edn/read-string))
 
 
 (def db-conn
+  ;; TODO: Check why it is loaded multiple times
+
   (m/sp (let [store-cfg (or (:db/conf (m/? conf/config))
                             {:backend  :mem
                              :id       (System/getProperty "himmelsstuermer.test.database.id"
                                                            (str (random-uuid)))})
-              schema    (m/? (m/join (fn [init & more]
-                                       (into init cat more))
-                                     himmelsstuermer-schema
-                                     (read-resource-dir "schema")))
+              schema    (into himmelsstuermer-schema
+                              (or (some->> "schema.edn" io/resource slurp read-string) []))
               opts      {:store              store-cfg
                          :schema-flexibility :write
                          :index              :datahike.index/persistent-set

@@ -17,21 +17,12 @@ RUN mkdir /graalvm
 RUN tar -xzvf /graalvm.tar.gz -C /graalvm --strip-components=1
 ENV JAVA_HOME=/graalvm
 ENV PATH="/graalvm/bin:$PATH"
-# RUN gu install native-image
-
-# Install Leiningen
-
-RUN curl -Lo /lein https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
-RUN mv /lein /usr/bin/
-RUN chmod +x /usr/bin/lein
-RUN lein
 
 # Install more packages
 
 RUN dnf install -y \
     gcc \
     glibc-devel \
-    # java-23-amazon-corretto-devel \
     git \
     readline-devel \
     autoconf \
@@ -40,23 +31,12 @@ RUN dnf install -y \
 
 RUN dnf clean all
 
-# Install rlwrap
+# Install Leiningen
 
-RUN curl -Lo rlwrap.tar.gz https://github.com/hanslub42/rlwrap/releases/download/0.46.1/rlwrap-0.46.1.tar.gz
-RUN mkdir /rlwrap
-RUN tar -xzvf rlwrap.tar.gz -C /rlwrap --strip-components=1
-WORKDIR /rlwrap
-RUN ./configure;
-RUN make
-RUN make check
-RUN make install
-WORKDIR /
-
-# Install Clojure
-
-RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh
-RUN chmod +x linux-install.sh
-RUN ./linux-install.sh
+RUN curl -Lo /lein https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+RUN mv /lein /usr/bin/
+RUN chmod +x /usr/bin/lein
+RUN lein
 
 # Copy project
 

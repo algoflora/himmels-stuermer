@@ -1,4 +1,5 @@
 (ns himmelsstuermer.core.logging
+  (:gen-class)
   (:require
     [cheshire.core :as json]
     [cheshire.generate :as gen]
@@ -10,11 +11,6 @@
     [me.raynes.fs :as fs]
     [taoensso.telemere :as tt]
     [taoensso.telemere.utils :as ttu]))
-
-
-(gen/add-encoder Object
-                 (fn [obj ^com.fasterxml.jackson.core.JsonGenerator json-generator]
-                   (.writeString json-generator (str obj))))
 
 
 (defonce ^:private nano-timer (atom nil))
@@ -96,6 +92,9 @@
 (defn init-logging!
   []
   (when (false? @initialized?)
+    (gen/add-encoder Object
+                     (fn [obj ^com.fasterxml.jackson.core.JsonGenerator json-generator]
+                       (.writeString json-generator (str obj))))
     (let [profile @conf/profile
           project-info (misc/project-info)]
       (tt/call-on-shutdown! shutdown-hook)

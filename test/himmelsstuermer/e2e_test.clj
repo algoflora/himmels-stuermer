@@ -1,13 +1,7 @@
 (ns himmelsstuermer.e2e-test
   (:gen-class)
   (:require
-    [himmelsstuermer.e2e.scenes :refer [situation-run defscene]]
-    [kaocha.runner :as runner]))
-
-
-(defn -main
-  [& args]
-  (runner/-main))
+    [himmelsstuermer.e2e.scenes :refer [situation-run defscene]]))
 
 
 (defscene :users/main-message

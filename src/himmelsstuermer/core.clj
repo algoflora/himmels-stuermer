@@ -4,7 +4,7 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [clojure.walk :refer [postwalk]]
-    [datahike.api :as d]
+    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.init]
     [himmelsstuermer.core.logging :refer [init-logging! reset-nano-timer! throwable->map]]
@@ -92,24 +92,13 @@
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
-(malli/=> load-database [:-> spec/State spec/State])
-
-
-(defn- load-database
-  [s]
-  (let [state (s/modify-state s #(assoc % :database @(-> s :system :db-conn)))
-        db    (:database state)]
-    (tt/event! ::loaded-database {:data {:database (str db)}})
-    state))
-
-
 (malli/=> handle-record [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
 (defn- handle-record
   [s record]
   (m/sp (let [body  (-> record :body json-decode)
-              state (load-database s)]
+              state (db/load-database s)]
           (cond
             (malli/validate spec.tg/Update body)
             (m/? (handle-update (s/modify-state state #(assoc % :update body))))
@@ -150,7 +139,7 @@
   [state tx-set]
   (m/via m/blk
          (tt/event! ::persisting-data {:data {:tx-set tx-set}})
-         (d/transact (-> state :system :db-conn) (vec tx-set))))
+         (db/transact state tx-set)))
 
 
 (defn- execute-business-logic
@@ -201,7 +190,8 @@
    :stackTrace   (mapv str (.getStackTrace t))})
 
 
-(def invocations
+(defn- invocations
+  []
   (m/seed (repeatedly (fn []
                         (let [url (str runtime-api-url "invocation/next")]
                           (tt/event! ::invocation-next-request {:data {:url url
@@ -217,18 +207,20 @@
                             resp))))))
 
 
-(def requests
-  (m/ap (let [initial-state (m/? s/state)]
+(defn- requests
+  []
+  (m/ap (let [initial-state (m/? (s/state))]
           (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
           (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
                                         {:state   (s/modify-state initial-state
                                                                   #(assoc % :aws-context headers))
                                          :records (:Records (json-decode body))}))
-                                 invocations))
+                                 (invocations)))
                (finally (s/shutdown! initial-state))))))
 
 
-(def app
+(defn- app
+  []
   (m/eduction
     (map (fn [{:keys [state records]}]
            (let [id (get-in state [:aws-context "lambda-runtime-aws-request-id"])]
@@ -250,11 +242,16 @@
                                  exc))
                     (http/post (str runtime-api-url "invocation/" id "/error")
                                {:body (json/encode (throwable->error-body exc))}))))))
-    requests))
+    (requests)))
+
+
+(defn run
+  [& args]
+  (init-logging!)
+  (tt/event! ::start-main {:data {:main "-main"}})
+  (m/? (m/reduce conj (app))))
 
 
 (defn -main
   [& args]
-  (init-logging!)
-  (tt/event! ::start-main {:data {:main "-main"}})
-  (m/? (m/reduce conj app)))
+  (apply run args))

@@ -6,6 +6,5 @@
  :plugins [:kaocha.plugin/profiling
            :kaocha.plugin/hooks]
  :kaocha.plugin.profiling/profiling? false
- :kaocha.plugin.randomize/randomize? false
  ;; :kaocha.hooks/post-load [himmelsstuermer.kaocha-hooks/repeat-tests]
  :watch? false}

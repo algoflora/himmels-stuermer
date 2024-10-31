@@ -24,7 +24,7 @@
 (def himmelsstuermer-config
   (m/sp
     (let [profile @profile
-          cfg (read-config (io/resource "himmelsstuermer-resources/config.edn")
+          cfg (read-config (io/resource "himmelsstuermer.config.edn")
                            {:profile profile})]
       (tt/event! ::himmelsstuermer-config-file-loaded {:data {:profile profile
                                                               :config cfg}})
@@ -33,9 +33,12 @@
 
 (def project-config
   (m/sp
-    (let [profile @profile
-          cfg (read-config (io/resource "config.edn")
-                           {:profile profile})]
+    (let [profile      @profile
+          cfg-resource (io/resource "config.edn")
+          cfg          (if (some? cfg-resource)
+                         (read-config (io/resource "config.edn")
+                                      {:profile profile})
+                         {})]
       (tt/event! ::project-config-file-loaded {:data {:profile profile
                                                       :config cfg}})
       cfg)))

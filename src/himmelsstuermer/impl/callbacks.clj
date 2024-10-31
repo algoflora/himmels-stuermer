@@ -1,4 +1,5 @@
 (ns himmelsstuermer.impl.callbacks
+  (:gen-class)
   (:require
     [datahike.api :as d]
     [himmelsstuermer.impl.transactor :refer [transact!]]

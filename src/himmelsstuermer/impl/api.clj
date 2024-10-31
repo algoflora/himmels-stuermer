@@ -51,6 +51,7 @@
               token  (-> state :bot :token)]
           (tt/event! ::calling-api-fn
                      {:data {:function api-fn
+                             :profile @conf/profile
                              :method method
                              :data data}})
           (api-fn token method data))))

@@ -336,20 +336,19 @@
    :clj-kondo/lint-as 'clojure.core/def}
   [name & args]
   (let [[h arg] (if (= 2 (count args)) [(first args) (second args)] [nil (first  args)])]
-    `(do
-       (clojure.test/deftest ~name
-         (let [~'a-clock (t/atom)
-               ~'scenes (mapv #(cond
-                                 (qualified-keyword? %) [% (get-scene %)]
-                                 (vector? %)            [:inline %])
-                              ~arg)]
-           (System/setProperty "himmelsstuermer.test.database.id" (str (random-uuid)))
-           (with-redefs [himmelsstuermer.core.dispatcher/main-handler
-                         ~(if (some? h)
-                            `(do
-                               (tt/event! ::mock-main-handler {:data {:symbol ~h}})
-                               (resolve ~h))
-                            `himmelsstuermer.core.dispatcher/main-handler)]
-             (binding [*clock* ~'a-clock]
-               (situation ~'scenes)))
-           (System/clearProperty "himmelsstuermer.test.database.id"))))))
+    `(clojure.test/deftest ~name
+       (let [~'a-clock (t/atom)
+             ~'scenes (mapv #(cond
+                               (qualified-keyword? %) [% (get-scene %)]
+                               (vector? %)            [:inline %])
+                            ~arg)]
+         (System/setProperty "himmelsstuermer.test.database.id" (str (random-uuid)))
+         (with-redefs [himmelsstuermer.core.dispatcher/main-handler
+                       ~(if (some? h)
+                          `(do
+                             (tt/event! ::mock-main-handler {:data {:symbol ~h}})
+                             (resolve ~h))
+                          `himmelsstuermer.core.dispatcher/main-handler)]
+           (binding [*clock* ~'a-clock]
+             (situation ~'scenes)))
+         (System/clearProperty "himmelsstuermer.test.database.id")))))

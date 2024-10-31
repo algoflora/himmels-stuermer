@@ -2,14 +2,10 @@
   (:require
     [himmelsstuermer.e2e.client :as cl]
     [himmelsstuermer.e2e.dummy :as dum]
-    [himmelsstuermer.e2e.serve :refer [set-serve-multimethod]]
     [taoensso.telemere :as tt]))
 
 
 (defmulti serve (fn [method _] method))
-
-
-(set-serve-multimethod serve)
 
 
 (defmethod serve :sendMessage
