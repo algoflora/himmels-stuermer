@@ -14,13 +14,13 @@ printf "\n\nBuild start...\n\n" &&
 
     ./target/test+uber-test+native/himmelsstuermer-native &&
 
-    printf "\n\nBuilding native image...\n\n" &&
+    # printf "\n\nBuilding native image...\n\n" &&
 
-    export HIMMELSSTUERMER_PROFILE=aws &&
-    lein with-profiles +uber,+native native-image &&
+    # export HIMMELSSTUERMER_PROFILE=aws &&
+    # lein with-profiles +uber,+native native-image &&
 
-    printf "\n\nRunning native image... (must fail!)\n\n" &&
+    # printf "\n\nRunning native image... (must fail!)\n\n" &&
     
-    ./target/uber+native/himmelsstuermer-native
+    # ./target/uber+native/himmelsstuermer-native
 
 bash

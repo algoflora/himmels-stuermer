@@ -21,7 +21,8 @@
             [lein-ancient "1.0.0-RC3"]
             [io.taylorwood/lein-native-image "0.3.1"]]
 
-  :native-image {:name "himmelsstuermer-native"}
+  :native-image {:name "himmelsstuermer-native"
+                 :aot [himmelsstuermer.core]}
 
   :source-paths ["src"]
   :resource-paths ["resources"]
@@ -35,7 +36,7 @@
                                     "-Dhimmelsstuermer.profile=test"]}
 
              :uber      {:main himmelsstuermer.core
-                         :aot :all #_[himmelsstuermer.core]
+                         :aot [himmelsstuermer.core]
                          :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
                          :uberjar-name "himmelsstuermer.jar"}
 

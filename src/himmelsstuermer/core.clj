@@ -190,8 +190,7 @@
    :stackTrace   (mapv str (.getStackTrace t))})
 
 
-(defn- invocations
-  []
+(def invocations
   (m/seed (repeatedly (fn []
                         (let [url (str runtime-api-url "invocation/next")]
                           (tt/event! ::invocation-next-request {:data {:url url
@@ -207,20 +206,18 @@
                             resp))))))
 
 
-(defn- requests
-  []
-  (m/ap (let [initial-state (m/? (s/state))]
+(def requests
+  (m/ap (let [initial-state (m/? s/state)]
           (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
           (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
                                         {:state   (s/modify-state initial-state
                                                                   #(assoc % :aws-context headers))
                                          :records (:Records (json-decode body))}))
-                                 (invocations)))
+                                 invocations))
                (finally (s/shutdown! initial-state))))))
 
 
-(defn- app
-  []
+(def app
   (m/eduction
     (map (fn [{:keys [state records]}]
            (let [id (get-in state [:aws-context "lambda-runtime-aws-request-id"])]
@@ -242,14 +239,14 @@
                                  exc))
                     (http/post (str runtime-api-url "invocation/" id "/error")
                                {:body (json/encode (throwable->error-body exc))}))))))
-    (requests)))
+    requests))
 
 
 (defn run
-  [& args]
+  [& _]
   (init-logging!)
   (tt/event! ::start-main {:data {:main "-main"}})
-  (m/? (m/reduce conj (app))))
+  (m/? (m/reduce conj app)))
 
 
 (defn -main
