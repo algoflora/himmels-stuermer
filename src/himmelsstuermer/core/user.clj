@@ -1,6 +1,6 @@
 (ns himmelsstuermer.core.user
   (:require
-    [datahike.api :as d]
+    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
@@ -82,7 +82,7 @@
                               '[?cb :callback/uuid ?uuuid]))
 
                [user? user-callback? callback?]
-               (first (d/q query database (:id from) uuid))
+               (first (db/q query database (:id from) uuid))
 
                ;; data (d/q query database (:id from) uuid)
                ;; datoms (mapv str (d/datoms database :eav))

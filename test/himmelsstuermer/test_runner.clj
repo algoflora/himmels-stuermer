@@ -2,6 +2,7 @@
   (:gen-class)
   (:require
     [clojure.test :refer [run-tests]]
+    ;; [db-backend]
     [himmelsstuermer.core.logging :refer [init-logging!]]
     [himmelsstuermer.e2e-test]
     [himmelsstuermer.e2e.core :refer [serve]]

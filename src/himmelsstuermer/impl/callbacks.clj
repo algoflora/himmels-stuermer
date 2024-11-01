@@ -1,7 +1,7 @@
 (ns himmelsstuermer.impl.callbacks
   (:gen-class)
   (:require
-    [datahike.api :as d]
+    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.impl.transactor :refer [transact!]]
     [himmelsstuermer.spec.core :as spec]
     [malli.core :as malli]
@@ -50,13 +50,13 @@
   (tt/event! ::clb-delete {:data {:user user :mid mid}})
   (m/sp (let [ueid (:db/id user)
               eids-to-retract (if (pos-int? ueid)
-                                (d/q '[:find ?cb
-                                       :in $ ?uid ?mid
-                                       :where
-                                       [?u :user/id ?uid]
-                                       [?cb :callback/message-id ?mid]
-                                       [?cb :callback/user ?u]]
-                                     (:idb state) (:user/id user) mid)
+                                (db/q '[:find ?cb
+                                        :in $ ?uid ?mid
+                                        :where
+                                        [?u :user/id ?uid]
+                                        [?cb :callback/message-id ?mid]
+                                        [?cb :callback/user ?u]]
+                                      (:idb state) (:user/id user) mid)
                                 #{})
               tx-data (into [] (map #(vector :db/retractEntity (first %))) eids-to-retract)]
           (transact! (:txs state) tx-data))))
@@ -73,15 +73,15 @@
   [{:keys [idb txs]} user mid uuids]
   (m/sp (let [ueid (:db/id user)
               eids-to-retract (if (pos-int? ueid)
-                                (d/q '[:find [?cb ...]
-                                       :in $ ?ueid ?mid ?uuids
-                                       :where
-                                       [?cb :callback/user ?ueid]
-                                       [?cb :callback/message-id ?mid]
-                                       [?cb :callback/uuid ?uuid]
-                                       (not-join [?uuid]
-                                                 [(contains? ?uuids ?uuid)])]
-                                     idb ueid mid (set uuids))
+                                (db/q '[:find [?cb ...]
+                                        :in $ ?ueid ?mid ?uuids
+                                        :where
+                                        [?cb :callback/user ?ueid]
+                                        [?cb :callback/message-id ?mid]
+                                        [?cb :callback/uuid ?uuid]
+                                        (not-join [?uuid]
+                                                  [(contains? ?uuids ?uuid)])]
+                                      idb ueid mid (set uuids))
                                 #{})
               tx-data (-> #{}
                           (into (map #(vector :db/retractEntity %) eids-to-retract))

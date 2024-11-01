@@ -2,8 +2,8 @@
   (:require
     [clojure.edn :as edn]
     [clojure.java.io :as io]
-    [datahike.api :as d]
     [himmelsstuermer.core.config :as conf]
+    [himmelsstuermer.core.db :as db]
     [missionary.core :as m]
     [taoensso.telemere :as tt]))
 
@@ -18,25 +18,19 @@
 (def db-conn
   ;; TODO: Check why it is loaded multiple times
 
-  (m/sp (let [store-cfg (or (:db/conf (m/? conf/config))
-                            {:backend  :mem
-                             :id       (System/getProperty "himmelsstuermer.test.database.id"
-                                                           (str (random-uuid)))})
-              schema    (into himmelsstuermer-schema
-                              (or (some->> "schema.edn" io/resource slurp read-string) []))
-              opts      {:store              store-cfg
-                         :schema-flexibility :write
-                         :index              :datahike.index/persistent-set
-                         :keep-history?      true
-                         :attribute-refs?    false
-                         :initial-tx         schema}
+  (m/sp (let [cfg    (or (:db/conf (m/? conf/config))
+                         {:backend  :mem
+                          :id       (System/getProperty "himmelsstuermer.test.database.id"
+                                                        (str (random-uuid)))})
+              schema (into himmelsstuermer-schema
+                           (or (some->> "schema.edn" io/resource slurp read-string) []))
 
-              conn      (do (when-not (d/database-exists? {:store store-cfg})
-                              (let [db (d/create-database opts)]
-                                (tt/event! ::database-created {:data {:database db}})))
-                            (d/connect opts))]
-          (tt/event! ::init-db-conn {:data {:store-config store-cfg
-                                            :options opts
+              conn   (do (when-not (db/db-exists? cfg)
+                           (let [db (db/create-db cfg schema)]
+                             (tt/event! ::database-created {:data {:database db}})))
+                         (db/connect cfg schema))]
+          (tt/event! ::init-db-conn {:data {:store-config cfg
+                                            :schema schema
                                             :connection conn}})
           {:db/conn conn})))
 

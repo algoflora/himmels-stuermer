@@ -5,13 +5,14 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[aero/aero "1.1.6"]
                  [cheshire "5.13.0"]
-                 [com.hyperfiddle/rcf "20220926-202227"]
-                 [com.taoensso/telemere "1.0.0-beta25"]
-                 [io.replikativ/datahike "0.6.1591"]
+                 [com.taoensso/telemere "1.0.0-RC1"]
                  [http-kit/http-kit "2.8.0"]
                  [me.raynes/fs "1.4.6"]
                  [metosin/malli "0.16.4"]
                  [missionary "b.40"]
+                 ;; [io.replikativ/datahike "0.6.1591"]
+                 ;; [org.clojure/tools.analyzer.jvm "1.3.0"]
+                 ;; [org.clojure/tools.reader "1.5.0"]
                  [org.clojure/clojure "1.12.0"]
                  [tick/tick "1.0"]
                  [lambdaisland/kaocha "1.91.1392"
@@ -32,6 +33,7 @@
 
   :profiles {:test      {:source-paths ["src" "test"]
                          :resource-paths ["resources" "test/resources"]
+                         :dependencies [[io.replikativ/datahike "0.6.1591"]]
                          :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
                                     "-Dhimmelsstuermer.profile=test"]}
 

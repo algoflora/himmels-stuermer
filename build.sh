@@ -5,14 +5,19 @@ printf "\n\nBuild start...\n\n" &&
     export HIMMELSSTUERMER_PROFILE=test &&
     lein test &&
 
+#     lein with-profiles +test,+uber-test uberjar &&
+#     java -agentlib:native-image-agent=config-output-dir=./reflect-config -jar target/uberjar/himmelsstuermer-test.jar
+
+# bash
+
     printf "\n\nBuilding test native image...\n\n" &&
     
-    # cp -r test/resources/* resources/ &&
+    lein clean &&
     lein with-profiles +test,+uber-test,+native native-image &&
     
     printf "\n\nTesting native image...\n\n" &&
 
-    ./target/test+uber-test+native/himmelsstuermer-native &&
+    ./target/test+uber-test+native/himmelsstuermer-native
 
     # printf "\n\nBuilding native image...\n\n" &&
 

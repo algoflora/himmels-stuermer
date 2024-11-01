@@ -1,7 +1,7 @@
 (ns himmelsstuermer.spec.core
   (:require
-    [datahike.spec :as spec.dh]
     [himmelsstuermer.api.buttons :as b]
+    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.impl.transactor]
     [himmelsstuermer.spec.telegram :as spec.tg]))
 
@@ -74,7 +74,7 @@
   [:map {:closed true}
    [:profile :keyword]
    [:system [:map {:closed true}
-             [:db-conn [:fn spec.dh/SConnection]]]]
+             [:db-conn [:fn db/is-conn?]]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
           [:roles [:map-of :keyword [:set [:or :int :string]]]]
@@ -82,7 +82,7 @@
    [:project [:map {:closed true}
               [:name :string]
               [:config :map]]]
-   [:database [:maybe [:fn spec.dh/SDB]]]
+   [:database [:maybe [:fn db/is-db?]]]
    [:action [:maybe Action]]
    [:update [:maybe spec.tg/Update]]
    [:message [:maybe spec.tg/Message]]
@@ -104,7 +104,7 @@
           [:default-language-code :keyword]]]
    [:prf :keyword]
    [:cfg :map]
-   [:idb [:fn spec.dh/SDB]]
+   [:idb [:fn db/is-db?]]
    [:txs [:fn #(satisfies? himmelsstuermer.impl.transactor/TransactionsAccumulator %)]]
    [:msg [:maybe spec.tg/Message]]
    [:cbq [:maybe spec.tg/CallbackQuery]]

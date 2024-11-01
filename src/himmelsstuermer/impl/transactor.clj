@@ -2,7 +2,6 @@
   (:require
     [clojure.data :as data]
     [himmelsstuermer.misc :as misc]
-    [hyperfiddle.rcf :as rcf :refer [tests tap %]]
     [taoensso.telemere :as tt]))
 
 

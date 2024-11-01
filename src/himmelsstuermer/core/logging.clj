@@ -4,8 +4,8 @@
     [cheshire.core :as json]
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
-    [datahike.db]
     [himmelsstuermer.core.config :as conf]
+    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
     [me.raynes.fs :as fs]
@@ -71,7 +71,7 @@
   (cond-> obj
     (instance? Throwable obj) throwable->map
 
-    (instance? datahike.db.DB obj) ((constantly "<DATAHIKE DB>"))
+    (db/is-db? obj) ((constantly "<DATAHIKE DB>"))
 
     (or (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str

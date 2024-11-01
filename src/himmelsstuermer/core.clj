@@ -92,13 +92,24 @@
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
+(malli/=> load-database [:-> spec/State spec/State])
+
+
+(defn load-database
+  [s]
+  (let [state (s/modify-state s #(assoc % :database @(-> s :system :db-conn)))
+        db    (:database state)]
+    (tt/event! ::loaded-database {:data {:database (str db)}})
+    state))
+
+
 (malli/=> handle-record [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
 (defn- handle-record
   [s record]
   (m/sp (let [body  (-> record :body json-decode)
-              state (db/load-database s)]
+              state (load-database s)]
           (cond
             (malli/validate spec.tg/Update body)
             (m/? (handle-update (s/modify-state state #(assoc % :update body))))
