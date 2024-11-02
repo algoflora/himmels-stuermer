@@ -63,10 +63,10 @@
 (defonce ^:private db-backend (atom (->DBBackendDummy)))
 
 
-(malli/=> set-database-backend [:-> [:fn #(satisfies? DBBackendProtocol %)] :nil])
+(malli/=> set-database-backend! [:-> [:fn #(satisfies? DBBackendProtocol %)] :nil])
 
 
-(defn set-database-backend
+(defn set-database-backend!
   [backend]
   (println "\nDatabase backend set: " (type backend) "\n")
   (reset! db-backend backend))

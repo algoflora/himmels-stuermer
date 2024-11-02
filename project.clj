@@ -10,9 +10,6 @@
                  [me.raynes/fs "1.4.6"]
                  [metosin/malli "0.16.4"]
                  [missionary "b.40"]
-                 ;; [io.replikativ/datahike "0.6.1592"]
-                 ;; [org.clojure/tools.analyzer.jvm "1.3.0"]
-                 ;; [org.clojure/tools.reader "1.5.0"]
                  [org.clojure/clojure "1.12.0"]
                  [tick/tick "1.0"]
                  [lambdaisland/kaocha "1.91.1392"
@@ -34,8 +31,7 @@
                          :resource-paths ["resources" "test/resources"]
                          :dependencies [[org.clojure/core.async "1.6.681"]
                                         [io.replikativ/datahike "0.6.1592"
-                                         :exclude [org.clojure/clojure
-                                                   org.clojure/core.async]]]
+                                         :exclude [org.clojure/core.async]]]
                          :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
                                     "-Dhimmelsstuermer.profile=test"]}
 

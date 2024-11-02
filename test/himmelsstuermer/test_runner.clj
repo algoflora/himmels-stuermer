@@ -14,7 +14,7 @@
 (defn -main
   [& _]
   (init-logging!)
-  (db/set-database-backend (dbbe/get-backend))
+  (db/set-database-backend! (dbbe/get-backend))
   (set-serve-multimethod! serve)
   (let [report (run-tests 'himmelsstuermer.e2e-test)]
     (when (or (pos? (:fail report)) (pos? (:error report)))
@@ -24,6 +24,6 @@
 (defn kaocha
   [& args]
   (init-logging!)
-  (db/set-database-backend (dbbe/get-backend))
+  (db/set-database-backend! (dbbe/get-backend))
   (set-serve-multimethod! serve)
   (apply kaocha.runner/-main args))
