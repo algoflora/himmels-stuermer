@@ -10,7 +10,7 @@
                  [me.raynes/fs "1.4.6"]
                  [metosin/malli "0.16.4"]
                  [missionary "b.40"]
-                 ;; [io.replikativ/datahike "0.6.1591"]
+                 ;; [io.replikativ/datahike "0.6.1592"]
                  ;; [org.clojure/tools.analyzer.jvm "1.3.0"]
                  ;; [org.clojure/tools.reader "1.5.0"]
                  [org.clojure/clojure "1.12.0"]
@@ -22,8 +22,7 @@
             [lein-ancient "1.0.0-RC3"]
             [io.taylorwood/lein-native-image "0.3.1"]]
 
-  :native-image {:name "himmelsstuermer-native"
-                 :aot [himmelsstuermer.core]}
+  :native-image {:name "himmelsstuermer-native"}
 
   :source-paths ["src"]
   :resource-paths ["resources"]
@@ -33,7 +32,10 @@
 
   :profiles {:test      {:source-paths ["src" "test"]
                          :resource-paths ["resources" "test/resources"]
-                         :dependencies [[io.replikativ/datahike "0.6.1591"]]
+                         :dependencies [[org.clojure/core.async "1.6.681"]
+                                        [io.replikativ/datahike "0.6.1592"
+                                         :exclude [org.clojure/clojure
+                                                   org.clojure/core.async]]]
                          :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
                                     "-Dhimmelsstuermer.profile=test"]}
 
@@ -43,7 +45,7 @@
                          :uberjar-name "himmelsstuermer.jar"}
 
              :uber-test {:main himmelsstuermer.test-runner
-                         :aot [himmelsstuermer.test-runner]
+                         :aot :all
                          :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
                          :uberjar-name "himmelsstuermer-test.jar"}
 

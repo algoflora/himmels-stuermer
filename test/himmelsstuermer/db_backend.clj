@@ -1,4 +1,4 @@
-(ns db-backend
+(ns himmelsstuermer.db-backend
   (:require
     [datahike.api :as d]
     [datahike.spec :as spec.dh]
@@ -55,4 +55,6 @@
     (d/transact cn tx-data)))
 
 
-(db/set-database-backend (->DBBackendDatahike))
+(defn get-backend
+  [& _]
+  (->DBBackendDatahike))
