@@ -70,17 +70,19 @@ ENV HIMMELSSTUERMER_PROFILE=aws
 RUN lein clean
 RUN --mount=type=cache,target=/root/.m2 lein with-profiles +uber,+native native-image
 RUN mkdir /lambda
-RUN cp ./target/uber+native/lambda /lambda
+RUN cp ./target/uber+native/lambda /lambda/bootstrap
 RUN cp -r ./.himmelsstuermer.build/. /lambda
 
 # Compress executable
 
 WORKDIR /lambda
-RUN strip ./lambda
-RUN /upx-4.2.4-${TARGET_ARCH}_linux/upx ./lambda
+RUN strip ./bootstrap
+RUN /upx-4.2.4-${TARGET_ARCH}_linux/upx ./bootstrap
 RUN ls -lah
 
-FROM amazonlinux:2023
+FROM public.ecr.aws/lambda/provided:latest
+
+ARG AUX_PACKAGES=""
 
 RUN if [ -n "$AUX_PACKAGES" ]; then \
         dnf install -y $AUX_PACKAGES; \
@@ -88,9 +90,8 @@ RUN if [ -n "$AUX_PACKAGES" ]; then \
 RUN dnf clean all
 
 ENV HIMMELSSTUERMER_PROFILE=aws
-COPY --from=builder /lambda /lambda
-WORKDIR /lambda
+COPY --from=builder /lambda/* /
 
 # Run build script
 
-CMD ./lambda
+CMD /bootstrap
