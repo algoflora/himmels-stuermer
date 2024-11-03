@@ -3,7 +3,6 @@
     [clojure.java.io :as io]
     [clojure.java.shell :refer [sh]]
     [clojure.string :as str]
-    [himmelsstuermer.blambda.internal :as lib]
     [himmelsstuermer.impl.config :refer [get-config]]
     [me.raynes.fs :as fs]
     [selmer.parser :as selmer]))
@@ -17,13 +16,11 @@
 
 (defn generate-vars
   [opts]
-  (let [lambda-zipfile (lib/lambda-zipfile opts)]
-    (selmer/render
-      (slurp (io/resource "himmelsstuermer.aws/aws.tfvars"))
-      (merge opts
-             {:lambda-filename lambda-zipfile
-              :lambda-architecture (first (lib/runtime-layer-architectures opts))
-              :bot-token (:bot/token (get-config))}))))
+  (selmer/render
+    (slurp (io/resource "himmelsstuermer.aws/aws.tfvars"))
+    (merge opts
+           {:lambda-architecture "provided.al2023"
+            :bot-token (:bot/token (get-config))})))
 
 
 (defn run-tf-cmd!
