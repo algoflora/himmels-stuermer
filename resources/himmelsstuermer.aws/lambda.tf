@@ -8,7 +8,7 @@ locals {
 
 variable "lambda_workspace" {
   type = string
-  default = "lambda-{{cluster}}-{{lambda-name}}"
+  default = "himmelsstuermer-lambda-{{cluster}}-{{lambda-name}}"
 }
 
 variable "region" {
@@ -65,13 +65,14 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
   function_name = "himmelsstuermer-${local.lambda_tags.cluster}-${var.lambda_name}"
-  role = "${aws_iam_role.lambda-{{lambda-name}}[0].arn}"
+  role          = "${aws_iam_role.lambda-{{lambda-name}}[0].arn}"
 
-  image_uri = "${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:latest"
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:latest"
   
-  memory_size = var.lambda_memory_size
+  memory_size   = var.lambda_memory_size
   architectures = var.lambda_architectures
-  timeout = var.lambda_timeout
+  timeout       = var.lambda_timeout
  
   file_system_config {
     arn = aws_efs_access_point.lambda-{{lambda-name}}[0].arn

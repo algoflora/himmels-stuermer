@@ -50,14 +50,14 @@
                                                               :command command
                                                               :dir dir})]
            (if continue?
-             (println exc)
+             (println (ex-message exc) "\nContinue...")
              (throw exc))))))))
 
 
 (defn apply!
   [opts]
-  (let [cluster-workspace (format "cluster-%s" (:cluster opts))
-        lambda-workspace  (format "lambda-%s-%s" (:cluster opts) (:lambda-name opts))]
+  (let [cluster-workspace (format "himmelsstuermer-cluster-%s" (:cluster opts))
+        lambda-workspace  (format "himmelsstuermer-lambda-%s-%s" (:cluster opts) (:lambda-name opts))]
     (run-tf-cmd! opts ["terraform" "init"])
     (run-tf-cmd! opts ["terraform" "workspace" "new" cluster-workspace] true)
     (run-tf-cmd! opts ["terraform" "workspace" "select" cluster-workspace])

@@ -28,7 +28,7 @@ variable "bot_token" {}
 
 variable "cluster_workspace" {
   type = string
-  default = "cluster-{{cluster}}"
+  default = "himmelsstuermer-cluster-{{cluster}}"
 }
 
 variable "cluster_tags" {
