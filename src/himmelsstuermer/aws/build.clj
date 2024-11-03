@@ -71,7 +71,3 @@
   (doseq [dir [target-dir work-dir]]
     (println "Removing directory:" dir)
     (fs/delete-dir dir)))
-
-
-;; https://download.oracle.com/graalvm/23/latest/graalvm-jdk-23_linux-aarch64_bin.tar.gz
-;; https://download.oracle.com/graalvm/23/latest/graalvm-jdk-23_linux-arm64_bin.tar.gz

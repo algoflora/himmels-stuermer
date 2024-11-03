@@ -17,7 +17,6 @@
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [missionary.core :as m]
-    [org.httpkit.client :as http]
     [taoensso.telemere :as tt]))
 
 
@@ -187,13 +186,6 @@
           (m/? (execute-business-logic state tasks)))))
 
 
-(def runtime-api-url (str "http://" (System/getenv "AWS_LAMBDA_RUNTIME_API") "/2018-06-01/runtime/"))
-
-
-;; API says not to use timeout when getting next invocation, so make it a long one
-(def timeout-ms (* 1000 60 60 24))
-
-
 (defn- throwable->error-body
   [^Throwable t]
   {:errorMessage (.getMessage t)
@@ -201,63 +193,58 @@
    :stackTrace   (mapv str (.getStackTrace t))})
 
 
-(def invocations
-  (m/seed (repeatedly (fn []
-                        (let [url (str runtime-api-url "invocation/next")]
-                          (tt/event! ::invocation-next-request {:data {:url url
-                                                                       :timeout timeout-ms}})
-                          (let [resp @(http/get url
-                                                {:timeout timeout-ms})]
-                            (when (:error resp)
-                              (let [exc     (:error resp)
-                                    exc-map (throwable->map exc)]
-                                (throw (tt/error! {:id ::invocation-next-error
-                                                   :data exc-map} exc))))
-                            (tt/event! ::invocation-next-response {:data {:response resp}})
-                            resp))))))
+(defn event
+  []
+  (m/sp (tt/event! ::listening-for-event)
+        (let [event (json/parse-stream *in* true)]
+          (tt/event! ::new-event {:data {:event event}})
+          event)))
 
 
-(def requests
-  (m/ap (let [initial-state (m/? s/state)]
+(defn request
+  []
+  (m/sp (let [[initial-state {:keys [body headers]}]
+              (m/? (m/join vector s/state (event)))]
           (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
-          (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
-                                        {:state   (s/modify-state initial-state
-                                                                  #(assoc % :aws-context headers))
-                                         :records (:Records (json-decode body))}))
-                                 invocations))
-               (finally (s/shutdown! initial-state))))))
+          {:state   (s/modify-state initial-state
+                                    #(assoc % :aws-context headers))
+           :records (:Records (json-decode body))})))
 
 
-(def app
-  (m/eduction
-    (map (fn [{:keys [state records]}]
-           (let [id (get-in state [:aws-context "lambda-runtime-aws-request-id"])]
-             (try (m/? (m/reduce (constantly :processed)
-                                 (m/ap (let [record (m/?> (m/seed records))]
-                                         (reset-nano-timer!)
-                                         (m/? (handle-core state record))
-                                         (tt/event! ::record-processed)
-                                         (tt/set-ctx! (assoc tt/*ctx* :state state))))))
+(defn app
+  []
+  (let [{:keys [state records]} (m/? (request))
+        id (-> state :aws-context :lambda-runtime-aws-request-id)]
+    (try (m/? (m/reduce (constantly :processed)
+                        (m/ap (let [record (m/?> (m/seed records))]
+                                (reset-nano-timer!)
+                                (println "RECORD!" record)
+                                (m/? (handle-core state record))
+                                (tt/event! ::record-processed)
+                                (tt/set-ctx! (assoc tt/*ctx* :state state))))))
 
-                  (tt/event! ::invocation-response-ok {:data {:invocation-id id}})
-                  (http/post (str runtime-api-url "invocation/" id "/response")
-                             {:body "OK"})
+         (tt/event! ::invocation-response-ok {:data {:invocation-id id}})
+         {:statusCode 200
+          :headers {"Content-Type" "application/json"}
+          :body (json/encode {:ok true})}
 
-                  (catch Exception exc
-                    (let [exc-map (throwable->map exc)]
-                      (tt/error! {:id   ::unhandled-exception
-                                  :data exc-map}
-                                 exc))
-                    (http/post (str runtime-api-url "invocation/" id "/error")
-                               {:body (json/encode (throwable->error-body exc))}))))))
-    requests))
+         (catch Exception exc
+           (let [exc-map (throwable->map exc)]
+             (tt/error! {:id   ::unhandled-exception
+                         :data exc-map}
+                        exc))
+           {:statusCode 500
+            :headers {"Content-Type" "application/json"}
+            :body (json/encode {:error (throwable->error-body exc)})}))))
 
 
 (defn run
   [& _]
   (init-logging!)
   (tt/event! ::start-main {:data {:main "-main"}})
-  (m/? (m/reduce conj app)))
+  (let [resp (app)]
+    (tt/event! ::stop-main {:data {:response resp}})
+    resp))
 
 
 (defn -main

@@ -93,7 +93,7 @@
    [:arguments :map]
    [:transaction [:set [:or :map [:vector :any]]]] ; TODO: Transaction vector spec?
    [:tasks [:set MissionaryTask]]
-   [:aws-context [:maybe [:map-of :string :string]]]])
+   [:aws-context [:maybe [:map-of :keyword :string]]]])
 
 
 (def UserState

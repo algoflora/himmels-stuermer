@@ -7,12 +7,13 @@
 
 (defn- create-datahike-opts
   [cfg schema]
-  {:store              cfg
-   :schema-flexibility :write
-   :index              :datahike.index/persistent-set
-   :keep-history?      true
-   :attribute-refs?    false
-   :initial-tx         schema})
+  {:store               cfg
+   :schema-flexibility  :write
+   :index               :datahike.index/persistent-set
+   :keep-history?       true
+   :allow-unsafe-config true
+   :attribute-refs?     false
+   :initial-tx          schema})
 
 
 (defrecord DBBackendDatahike

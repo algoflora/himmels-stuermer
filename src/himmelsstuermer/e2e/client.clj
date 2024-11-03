@@ -22,9 +22,9 @@
   (let [update      (assoc data :update_id (swap! update-id inc))
         mock-record (generate spec/Record)
         mock-data   {:body (json/encode {:Records [(assoc mock-record :body (json/encode update))]})
-                     :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
+                     :headers {:lambda-runtime-aws-request-id (str (random-uuid))}}]
     (tt/event! ::send-update {:data {:update update :mock-data mock-data}})
-    (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
+    (alter-var-root #'himmelsstuermer.core/event (constantly (fn [] (m/sp mock-data))))
     (himmelsstuermer.core/run)))
 
 
@@ -37,7 +37,7 @@
         mock-data   {:body (json/encode {:Records [(assoc mock-record :body (json/encode action-request))]})
                      :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
     (tt/event! ::send-action-request {:data {:update update :mock-data mock-data}})
-    (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [mock-data])))
+    (alter-var-root #'himmelsstuermer.core/event (constantly (fn [] (m/sp mock-data))))
     (himmelsstuermer.core/run)))
 
 
