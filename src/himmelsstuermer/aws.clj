@@ -6,7 +6,7 @@
 
 
 (def default-opts
-  {:arch "aarch64"
+  {:arch "arm64"
    :tfstate-bucket "himmelsstuermer"
    :lambda-memory-size 512
    ;; :lambda-name
@@ -20,9 +20,9 @@
 
 
 (defn deploy!
-  [opts]
+  [opts & args]
   (println "Deploy started...\nUser options:" opts)
-  (let [opts (merge default-opts (read-string opts))
+  (let [opts (merge (assoc default-opts :args args) (read-string opts))
         _ (println "Full opts: " opts)
         nsec (do-nanos (let [{:keys [exit-code image-name]} (build-image opts)
                              _ (when (not (zero? exit-code))

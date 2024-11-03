@@ -2,6 +2,7 @@
   (:require
     [clojure.java.io :as io]
     [clojure.string :as str]
+    [himmelsstuermer.aws.common :refer [stream-to-out]]
     [me.raynes.fs :as fs])
   (:import
     (java.lang
@@ -26,16 +27,6 @@
 (defn- current-datetime
   []
   (.format (java.text.SimpleDateFormat. "yyyy-MM-dd-HH-mm-ss") (java.util.Date.)))
-
-
-(defn stream-to-out
-  [input-stream]
-  (let [reader (java.io.BufferedReader. (java.io.InputStreamReader. input-stream))]
-    (future
-      (loop []
-        (when-let [line (.readLine reader)]
-          (println line)
-          (recur))))))
 
 
 (defn dockerfile-to-temp
@@ -63,7 +54,8 @@
                  "--build-arg" packages
                  "--build-arg" arch
                  "--build-arg" arch-2
-                 "--progress=plain"
+                 "--no-cahce"
+                 ;; "--progress=plain"
                  "."]
         builder (ProcessBuilder. command)
         _ (.put (.environment builder) "DOCKER_BUILDKIT" "1")

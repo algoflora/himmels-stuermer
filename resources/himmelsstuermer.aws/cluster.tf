@@ -17,22 +17,12 @@ terraform {
   }
 }
 
-variable "runtime_layer_name" {}
-variable "runtime_layer_compatible_architectures" {}
-variable "runtime_layer_compatible_runtimes" {}
-variable "runtime_layer_filename" {}
-variable "deps_layer_name" {}
-variable "deps_layer_compatible_architectures" {}
-variable "deps_layer_compatible_runtimes" {}
-variable "deps_layer_filename" {}
-
 variable "lambda_name" {}
-variable "lambda_handler" {}
-variable "lambda_filename" {}
 variable "lambda_memory_size" {}
-variable "lambda_runtime" {}
 variable "lambda_architectures" {}
 variable "lambda_timeout" {}
+
+variable "image_name" {}
 
 variable "bot_token" {}
 
