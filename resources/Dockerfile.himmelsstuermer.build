@@ -91,3 +91,5 @@ RUN dnf clean all
 
 ENV HIMMELSSTUERMER_PROFILE=aws
 COPY --from=builder /lambda /var/runtime
+
+ENTRYPOINT [ "main" ]
