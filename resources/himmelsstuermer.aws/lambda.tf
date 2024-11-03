@@ -45,7 +45,7 @@ resource "null_resource" "push_image-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
   triggers = {
-    timestamp = timestamp()
+    image = "${var.image_name}:${var.image_tag}"
   }
 
   provisioner "local-exec" {
