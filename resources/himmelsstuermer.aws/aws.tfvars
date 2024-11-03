@@ -6,5 +6,6 @@ lambda_timeout = {{lambda-timeout}}
 lambda_architectures = ["{{lambda-architecture}}"]
 
 image_name = "{{image-name}}"
+image_tag = "{{image-tag}}"
 
 bot_token = "{{bot-token}}"

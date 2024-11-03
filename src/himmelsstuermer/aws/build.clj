@@ -44,12 +44,11 @@
                            (:cluster opts)
                            (:lambda-name opts))
         image-tag  (current-datetime)
-        tag        (format "%s:%s" image-name image-tag)
         packages   (format "AUX_PACKAGES=%s" (str/join " " (map str (:aux-packages opts))))
         arch       (format "TARGET_ARCH=%s" (:arch opts))
         arch-2     (format "TARGET_ARCH_2=%s" (if (= "arm64" (:arch opts)) "aarch64" (:arch opts)))
         command (-> ["docker" "build"
-                     "-t" tag
+                     "-t" (format "%s:%s" image-name image-tag)
                      "-f" (dockerfile-to-temp)
                      "--build-arg" packages
                      "--build-arg" arch
@@ -62,7 +61,8 @@
     (stream-to-out (.getInputStream process))
     (stream-to-out (.getErrorStream process))
     {:exit-code  (.waitFor process)
-     :image-name tag}))
+     :image-name image-name
+     :image-tag  image-tag}))
 
 
 (defn clean

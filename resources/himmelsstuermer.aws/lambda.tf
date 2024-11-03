@@ -54,10 +54,10 @@ resource "null_resource" "push_image-{{lambda-name}}" {
       aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${data.aws_ecr_authorization_token.auth.proxy_endpoint}
 
       # Tag the local Docker image with the ECR repository URI
-      docker tag ${var.image_name} ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:latest
+      docker tag ${var.image_name}:${var.image_tag} ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}
 
       # Push the tagged Docker image to ECR
-      docker push ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:latest
+      docker push ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}
     EOT
   }
 
@@ -72,7 +72,7 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
   role          = "${aws_iam_role.lambda-{{lambda-name}}[0].arn}"
 
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}"
   
   memory_size   = var.lambda_memory_size
   architectures = var.lambda_architectures

@@ -23,6 +23,7 @@ variable "lambda_architectures" {}
 variable "lambda_timeout" {}
 
 variable "image_name" {}
+variable "image_tag" {}!
 
 variable "bot_token" {}
 
