@@ -12,7 +12,9 @@ target/
 !.clj-kondo/config.edn
 .cpcache/
 .lsp/
-.work
+.work/
+
+.himmelsstuermer.build/
 
 # Emacs
 

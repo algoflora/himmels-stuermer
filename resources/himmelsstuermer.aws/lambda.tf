@@ -26,45 +26,53 @@ data "terraform_remote_state" "cluster" {
   }
 }
 
-module "runtime-{{lambda-name}}" {
+# ECR Repository
+resource "aws_ecr_repository" "ecr-repo-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
-  source = "./{{tf-module-dir}}"
+  name = "himmelsstuermer-${local.lambda_tags.cluster}-ecr-repo-${var.lambda_name}"
 
-  layer_name = var.runtime_layer_name
-  compatible_architectures = var.runtime_layer_compatible_architectures
-  compatible_runtimes = var.runtime_layer_compatible_runtimes
-  filename = var.runtime_layer_filename
+  tags = merge(local.lambda_tags, {
+    Name = "himmelsstuermer.${local.lambda_tags.cluster}.ecr-repo.${var.lambda_name}"
+  })
 }
 
-module "deps-{{lambda-name}}" {
+# Get the login command to authenticate Docker to ECR
+data "aws_ecr_authorization_token" "auth" {}
+
+# Execute Docker push command
+resource "null_resource" "push_image-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
-  source = "./{{tf-module-dir}}"
+  provisioner "local-exec" {
+    command = <<EOT
+      # Authenticate Docker to ECR
+      aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${data.aws_ecr_authorization_token.auth.proxy_endpoint}
 
-  layer_name = var.deps_layer_name
-  compatible_architectures = var.deps_layer_compatible_architectures
-  compatible_runtimes = var.deps_layer_compatible_runtimes
-  filename = var.deps_layer_filename
+      # Tag the local Docker image with the ECR repository URI
+      docker tag ${var.image_name} ${aws_ecr_repository.ecr-repo-{{lambda-name}}.repository_url}:latest
+
+      # Push the tagged Docker image to ECR
+      docker push ${aws_ecr_repository.ecr-repo-{{lambda-name}}.repository_url}:latest
+    EOT
+  }
+
+  depends_on = [aws_ecr_repository.ecr-repo-{{lambda-name}}]
 }
 
+# Lambda Function
 resource "aws_lambda_function" "lambda-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
   function_name = "himmelsstuermer-${local.lambda_tags.cluster}-${var.lambda_name}"
   role = "${aws_iam_role.lambda-{{lambda-name}}[0].arn}"
-  handler = var.lambda_handler
+
+  image_uri = "${aws_ecr_repository.ecr-repo-{{lambda-name}}.repository_url}:latest"
+  
   memory_size = var.lambda_memory_size
-  source_code_hash = filebase64sha256(var.lambda_filename)
-  filename = var.lambda_filename
-  runtime = var.lambda_runtime
   architectures = var.lambda_architectures
   timeout = var.lambda_timeout
-  layers = [
-    module.runtime-{{lambda-name}}[0].arn,
-    module.deps-{{lambda-name}}[0].arn,
-  ]
-
+ 
   file_system_config {
     arn = aws_efs_access_point.lambda-{{lambda-name}}[0].arn
     local_mount_path = "/mnt/efs"
@@ -82,6 +90,8 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
   {% endfor %}
     }
   }
+
+  depends_on=[null_resource.push_image-{{lambda-name}}]
 
   tags = merge(local.lambda_tags, {
     Name = "himmelsstuermer.${local.lambda_tags.cluster}.lambda.${var.lambda_name}"
