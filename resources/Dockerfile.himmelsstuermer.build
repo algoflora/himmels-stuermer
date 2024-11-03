@@ -90,8 +90,4 @@ RUN if [ -n "$AUX_PACKAGES" ]; then \
 RUN dnf clean all
 
 ENV HIMMELSSTUERMER_PROFILE=aws
-COPY --from=builder /lambda/* /
-
-# Run build script
-
-CMD /bootstrap
+COPY --from=builder /lambda /var/runtime
