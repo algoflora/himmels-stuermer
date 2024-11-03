@@ -239,9 +239,11 @@
 
 
 (defn run
-  [& _]
+  [& args]
   (init-logging!)
-  (tt/event! ::start-main {:data {:main "-main"}})
+  (clojure.pprint/pprint [:ARGS args])
+  (tt/event! ::start-main {:data {:main "-main"
+                                  :args args}})
   (let [resp (app)]
     (tt/event! ::stop-main {:data {:response resp}})
     resp))
