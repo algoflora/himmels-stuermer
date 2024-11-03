@@ -47,14 +47,13 @@
         tag        (format "%s:%s" image-name image-tag)
         packages   (format "AUX_PACKAGES=%s" (str/join " " (map str (:aux-packages opts))))
         arch       (format "TARGET_ARCH=%s" (:arch opts))
-        arch-2     (format "TARGET_ARCH_2=%s" (if (= "aarch64" (:arch opts)) "arm64" (:arch opts)))
+        arch-2     (format "TARGET_ARCH_2=%s" (if (= "arm64" (:arch opts)) "aarch64" (:arch opts)))
         command (-> ["docker" "build"
                      "-t" tag
                      "-f" (dockerfile-to-temp)
                      "--build-arg" packages
                      "--build-arg" arch
-                     "--build-arg" arch-2
-                     "--no-cachce"]
+                     "--build-arg" arch-2]
                     (into (map str) (:args opts))
                     (conj "."))
         builder (ProcessBuilder. command)
@@ -72,3 +71,7 @@
   (doseq [dir [target-dir work-dir]]
     (println "Removing directory:" dir)
     (fs/delete-dir dir)))
+
+
+;; https://download.oracle.com/graalvm/23/latest/graalvm-jdk-23_linux-aarch64_bin.tar.gz
+;; https://download.oracle.com/graalvm/23/latest/graalvm-jdk-23_linux-arm64_bin.tar.gz

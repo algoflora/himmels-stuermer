@@ -3,8 +3,8 @@
 FROM amazonlinux:2023 as builder
 
 ARG GRAALVM_VERSION=23
-ARG TARGET_ARCH=aarch64
-ARG TARGET_ARCH_2=arm64
+ARG TARGET_ARCH=arm64
+ARG TARGET_ARCH_2=aarch64
 ARG AUX_PACKAGES=""
 
 # Install necessary packages
@@ -29,7 +29,7 @@ RUN dnf clean all
 
 # Install GraalVM
 
-RUN curl -Lo /graalvm.tar.gz "https://download.oracle.com/graalvm/${GRAALVM_VERSION}/latest/graalvm-jdk-${GRAALVM_VERSION}_linux-${TARGET_ARCH}_bin.tar.gz"
+RUN curl -Lo /graalvm.tar.gz "https://download.oracle.com/graalvm/${GRAALVM_VERSION}/latest/graalvm-jdk-${GRAALVM_VERSION}_linux-${TARGET_ARCH_2}_bin.tar.gz"
 RUN mkdir /graalvm
 RUN tar -xzvf /graalvm.tar.gz -C /graalvm --strip-components=1
 ENV JAVA_HOME=/graalvm
@@ -37,7 +37,7 @@ ENV PATH="/graalvm/bin:$PATH"
 
 # Install UPX
 
-RUN curl -Lo /upx.tar.xz "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-${TARGET_ARCH_2}_linux.tar.xz"
+RUN curl -Lo /upx.tar.xz "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-${TARGET_ARCH}_linux.tar.xz"
 RUN tar -xvf /upx.tar.xz
 
 # Install Leiningen
@@ -77,7 +77,7 @@ RUN cp -r ./.himmelsstuermer.build/. /lambda
 
 WORKDIR /lambda
 RUN strip ./lambda
-RUN /upx-4.2.4-${TARGET_ARCH_2}_linux/upx ./lambda
+RUN /upx-4.2.4-${TARGET_ARCH}_linux/upx ./lambda
 RUN ls -lah
 
 FROM amazonlinux:2023
