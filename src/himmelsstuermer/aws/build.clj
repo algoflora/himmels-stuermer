@@ -48,15 +48,15 @@
         packages   (format "AUX_PACKAGES=%s" (str/join " " (map str (:aux-packages opts))))
         arch       (format "TARGET_ARCH=%s" (:arch opts))
         arch-2     (format "TARGET_ARCH_2=%s" (if (= "aarch64" (:arch opts)) "arm64" (:arch opts)))
-        command ["docker" "build"
-                 "-t" tag
-                 "-f" (dockerfile-to-temp)
-                 "--build-arg" packages
-                 "--build-arg" arch
-                 "--build-arg" arch-2
-                 "--no-cahce"
-                 ;; "--progress=plain"
-                 "."]
+        command (-> ["docker" "build"
+                     "-t" tag
+                     "-f" (dockerfile-to-temp)
+                     "--build-arg" packages
+                     "--build-arg" arch
+                     "--build-arg" arch-2
+                     "--no-cachce"]
+                    (into (map str) (:args opts))
+                    (conj "."))
         builder (ProcessBuilder. command)
         _ (.put (.environment builder) "DOCKER_BUILDKIT" "1")
         process (.start builder)]
