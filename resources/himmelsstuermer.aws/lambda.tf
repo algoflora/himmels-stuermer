@@ -469,6 +469,7 @@ resource "null_resource" "deploy_api-{{lambda-name}}" {
   depends_on = [
     aws_api_gateway_resource.api_resource-{{lambda-name}},
     aws_api_gateway_method.api_method-{{lambda-name}},
+    aws_lambda_function.lambda-{{lambda-name}},
     aws_api_gateway_integration.sqs_integration-{{lambda-name}},
     aws_secretsmanager_secret_version.bot_secret_token-{{lambda-name}}
   ]
