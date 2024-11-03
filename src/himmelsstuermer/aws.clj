@@ -8,7 +8,7 @@
 (def default-opts
   {:arch "arm64"
    :tfstate-bucket "himmelsstuermer"
-   :lambda-memory-size 512
+   :lambda-memory-size 2048
    ;; :lambda-name
    ;; :cluster
    :lambda-timeout 15

@@ -44,6 +44,10 @@ data "aws_ecr_authorization_token" "auth" {}
 resource "null_resource" "push_image-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
+  triggers = {
+    timestamp = timestamp()
+  }
+
   provisioner "local-exec" {
     command = <<EOT
       # Authenticate Docker to ECR
