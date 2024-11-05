@@ -18,9 +18,10 @@
   (fs/mkdir files-dir)
   (let [hs-dir (fs/file files-dir)]
     (doseq [path paths]
-      (let [[src-path dst-path] (if (seqable? path)
+      (let [[src-path dst-path] (if (sequential? path)
                                   [(first path) (second path)]
                                   [path (if (fs/absolute? path) (fs/name path) path)])]
+        (println "FILES" src-path hs-dir dst-path)
         (fs/copy src-path (fs/file hs-dir dst-path))))))
 
 

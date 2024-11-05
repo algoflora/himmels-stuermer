@@ -170,8 +170,7 @@
                                        :data exc-map} exc))
                     (let [_ (tt/error! {:id   ::business-logic-error
                                         :data exc-map} exc)
-                          fallback-task (err/handle-error (s/construct-user-state state)
-                                                          exc)]
+                          fallback-task (err/handle-error (s/construct-user-state state) exc)]
 
                       (m/? (execute-business-logic state #{fallback-task} true))))))))))
 
@@ -187,7 +186,9 @@
           (m/? (execute-business-logic state tasks)))))
 
 
-(def runtime-api-url (str "http://" (System/getenv "AWS_LAMBDA_RUNTIME_API") "/2018-06-01/runtime/"))
+(defn runtime-api-url
+  [path]
+  (str "http://" (System/getenv "AWS_LAMBDA_RUNTIME_API") "/2018-06-01/runtime/" path))
 
 
 ;; API says not to use timeout when getting next invocation, so make it a long one
@@ -202,64 +203,73 @@
 
 
 (def invocations
-  (m/seed (repeatedly (fn []
-                        (let [url (str runtime-api-url "invocation/next")]
-                          (tt/event! ::invocation-next-request {:data {:url url
-                                                                       :timeout timeout-ms}})
-                          (let [resp @(http/get url
-                                                {:timeout timeout-ms})]
-                            (when (:error resp)
-                              (let [exc     (:error resp)
-                                    exc-map (throwable->map exc)]
-                                (throw (tt/error! {:id ::invocation-next-error
-                                                   :data exc-map} exc))))
-                            (tt/event! ::invocation-next-response {:data {:response resp}})
-                            resp))))))
+  (m/seed (repeatedly
+            (m/via m/blk (let [url (runtime-api-url "invocation/next")]
+                           (tt/event! ::invocation-next-request {:data {:url url
+                                                                        :timeout timeout-ms}})
+                           @(http/get url {:timeout timeout-ms}))))))
 
 
-(def requests
-  (m/ap (let [initial-state (m/? s/state)]
-          (tt/set-ctx! (merge tt/*ctx* {:state initial-state}))
-          (try (m/?> (m/eduction (map (fn [{:keys [body headers]}]
-                                        {:state   (s/modify-state initial-state
-                                                                  #(assoc % :aws-context headers))
-                                         :records (:Records (json-decode body))}))
-                                 invocations))
-               (finally (s/shutdown! initial-state))))))
+(def events
+  (m/ap (let [initial-state (m/? s/state)
+              invoation-task (m/?> invocations)
+              {:keys [body headers]} (m/? invoation-task)]
+          (tt/set-ctx! (assoc tt/*ctx* :aws-context headers))
+          {:state   (s/modify-state initial-state
+                                    #(assoc % :aws-context headers))
+           :records (:Records (json-decode body))})))
 
 
 (def app
-  (m/eduction
-    (map (fn [{:keys [state records]}]
-           (let [id (get-in state [:aws-context "lambda-runtime-aws-request-id"])]
-             (try (m/? (m/reduce (constantly :processed)
-                                 (m/ap (let [record (m/?> (m/seed records))]
-                                         (reset-nano-timer!)
-                                         (m/? (handle-core state record))
-                                         (tt/event! ::record-processed)
-                                         (tt/set-ctx! (assoc tt/*ctx* :state state))))))
+  (m/ap (let [{:keys [state records]} (m/?> events)
+              id (-> state :aws-context :lambda-runtime-aws-request-id)]
+          (try (m/? (m/reduce (constantly :processed)
+                              (m/ap (let [record (m/?> (m/seed records))]
+                                      (reset-nano-timer!)
+                                      (m/? (handle-core state record))
+                                      (tt/event! ::record-processed)
+                                      #_(tt/set-ctx! (assoc tt/*ctx* :state state))))))
 
-                  (tt/event! ::invocation-response-ok {:data {:invocation-id id}})
-                  (http/post (str runtime-api-url "invocation/" id "/response")
-                             {:body "OK"})
+               (let [aws-response @(http/post (runtime-api-url (format "invocation/%s/response" id))
+                                              {:body "OK"})]
+                 (tt/event! ::invocation-response-ok {:data {:invocation-id id
+                                                             :aws-response  aws-response}}))
 
-                  (catch Exception exc
-                    (let [exc-map (throwable->map exc)]
-                      (tt/error! {:id   ::unhandled-exception
-                                  :data exc-map}
-                                 exc))
-                    (http/post (str runtime-api-url "invocation/" id "/error")
-                               {:body (json/encode (throwable->error-body exc))}))))))
-    requests))
+
+               (catch Exception exc
+                 (let [exc-map (throwable->map exc)
+                       aws-response (http/post (runtime-api-url (format "invocation/%s/error" id))
+                                               {:body (json/encode (throwable->error-body exc))})]
+                   (tt/error! {:id   ::unhandled-exception
+                               :data {:invocation-id id
+                                      :error         exc-map
+                                      :aws-response  aws-response}}
+                              exc)))
+               (finally (tt/set-ctx! (dissoc tt/*ctx* :aws-context)))))))
 
 
 (defn run
   [& _]
   (init-logging!)
-  (tt/event! ::start-main {:data {:main "-main"}})
+  (tt/event! ::start-main {:let [env (System/getenv)]
+                           :data {:main "-main"
+                                  :environment env}})
   (m/? (m/reduce conj app)))
 
 
 (defn -main
   [& args]
   (apply run args))
+
+
+(comment
+
+  (def fl (m/seed (repeatedly 3 (fn [] (m/via m/blk
+                                         (println "REQUEST")
+                                         @(http/get "http://ifconfig.me"))))))
+
+  (println "--------")
+  (m/? (m/reduce conj (m/ap (let [resp (m/?> fl)]
+                              (m/? (m/sleep 1000))
+                              (println "RESPONSE" (subs (:body (m/? resp)) 0 10))))))
+  )

@@ -71,18 +71,20 @@ RUN lein clean
 RUN --mount=type=cache,target=/root/.m2 lein with-profiles +uber,+native native-image
 RUN mkdir /result
 RUN cp ./target/uber+native/lambda /result/lambda
-RUN cp -r ./.himmelsstuermer.build/. /lambda
+RUN cp -r ./.himmelsstuermer.build/. /result
 
 # Compress executable
 
-WORKDIR /lambda
-RUN strip ./bootstrap
+WORKDIR /result
+RUN strip ./lambda
 RUN /upx-4.2.4-${TARGET_ARCH}_linux/upx ./lambda
 RUN ls -lah
 
 FROM public.ecr.aws/lambda/provided:latest
 
-ARG AUX_PACKAGES=""
+ENV AWS_LAMBDA_RUNTIME_API "NO DATA"
+
+ARG AUX_PACKAGES
 
 RUN if [ -n "$AUX_PACKAGES" ]; then \
         dnf install -y $AUX_PACKAGES; \
@@ -90,7 +92,10 @@ RUN if [ -n "$AUX_PACKAGES" ]; then \
 RUN dnf clean all
 
 ENV HIMMELSSTUERMER_PROFILE=aws
-COPY --from=builder /result /var/runtime
-RUN ls -lah /var/runtime!
+COPY --from=builder /result/. /var/runtime
+RUN ls -lah /var/runtime
 
-ENTRYPOINT [ "lambda" ]
+# Ensure the executable has the right permissions
+RUN chmod +x /var/runtime/lambda
+
+ENTRYPOINT [ "/var/runtime/lambda" ]

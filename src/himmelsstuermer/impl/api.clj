@@ -1,8 +1,10 @@
 (ns ^:no-doc himmelsstuermer.impl.api
   (:require
     [cheshire.core :refer [generate-string parse-string]]
+    [clojure.walk :refer [postwalk]]
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.core.config :as conf]
+    [himmelsstuermer.core.logging :refer [throwable->map]]
     [himmelsstuermer.e2e.serve]
     [himmelsstuermer.impl.buttons :as ib]
     [himmelsstuermer.impl.callbacks :as clb]
@@ -22,7 +24,7 @@
   (let [url  (format "https://api.telegram.org/bot%s/%s" token (name method))
 
         {:keys [result nanos]}
-        (misc/do-nanos* @(http/post url {:headers {:content-type "application/json"}
+        (misc/do-nanos* @(http/post url {:headers {"Content-Type" "application/json"}
                                          :body (generate-string data)}))
 
         resp (update result :body #(try (parse-string % true)
@@ -33,11 +35,15 @@
                        :response resp
                        :time-millis (* 0.000001 nanos)}})
     (if (-> resp :body :ok)
-      (-> resp :body :result)
-      (tt/error! ::bad-telegram-api-response (ex-info "Bad Telegram API response!"
-                                                      {:method method
-                                                       :data data
-                                                       :response resp})))))
+      (postwalk #(if (instance? java.lang.Integer %) (long %) %)
+                (-> resp :body :result))
+      (let [exc (ex-info "Bad Telegram API response!"
+                         {:method method
+                          :status (:status resp)
+                          :data data
+                          :response resp})]
+        (throw (tt/error! {:id ::bad-telegram-api-response
+                           :data (ex-data exc)} exc))))))
 
 
 (malli/=> api-task [:=> [:cat spec/UserState :keyword :map] spec/MissionaryTask])
@@ -309,8 +315,19 @@
   [state user mid]
   (m/join (constantly (:txs state))
           (clb/delete state user mid)
-          (api-task state :deleteMessage {:chat_id (:user/id user)
-                                          :message_id mid})))
+          (try (api-task state :deleteMessage {:chat_id (:user/id user)
+                                               :message_id mid})
+               (catch Exception exc
+                 (when (not= 400 (-> exc ex-data :status))
+                   (throw (ex-info "Request to :deleteMessage failed!"
+                                   {:event ::delete-message-error
+                                    :user user
+                                    :message-id mid
+                                    :error exc})))
+                 (let [exc-map (throwable->map exc)]
+                   (tt/event! ::delete-message-failed {:data {:user user
+                                                              :message-id mid
+                                                              :error exc-map}}))))))
 
 
 (defn answer-pre-checkout-query

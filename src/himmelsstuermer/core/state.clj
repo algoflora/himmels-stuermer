@@ -99,7 +99,7 @@
   (let [caller          (misc/get-caller)
         state'          (modify-fn state)
         [removed added] (data/diff state state')]
-    (tt/set-ctx! (assoc tt/*ctx* :state state'))
+    ;; (tt/set-ctx! (assoc tt/*ctx* :state state'))
     (tt/event! ::state-modified
                {:data {:removed removed
                        :added added
