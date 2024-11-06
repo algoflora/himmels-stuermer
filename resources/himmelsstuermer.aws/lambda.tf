@@ -77,11 +77,6 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
   memory_size   = var.lambda_memory_size
   architectures = var.lambda_architectures
   timeout       = var.lambda_timeout
- 
-  file_system_config {
-    arn = aws_efs_access_point.lambda-{{lambda-name}}[0].arn
-    local_mount_path = "/mnt/efs"
-  }
 
   vpc_config {
     subnet_ids         = data.terraform_remote_state.cluster[0].outputs.aws_subnet_private[*].id
@@ -90,6 +85,9 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
 
   environment {
     variables = {
+      DATOMIC_ENDPOINT = data.terraform_remote_state.cluster[0].outputs.datomic_endpoint
+      AWS_REGION       = var.region
+      DATOMIC_SYSTEM   = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-system"
   {% for i in lambda-env-vars %}
       {{i.key}} = "{{i.val}}"
   {% endfor %}
@@ -365,12 +363,20 @@ resource "aws_iam_policy" "lambda-{{lambda-name}}" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
+        Effect   = "Allow"
+        Action   = [
+          "datomic:*",
+          "dynamodb:*",
+          "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:CreateNetworkInterface",
+          "ec2:DeleteNetworkInterface",
+          "ec2:DescribeInstances",
+          "ec2:AttachNetworkInterface"
         ]
-        Resource = ["${aws_cloudwatch_log_group.lambda-{{lambda-name}}[0].arn}:*"]
+        Resource = "*"
       }
     ]
   })
@@ -399,37 +405,6 @@ resource "aws_iam_role_policy_attachment" "lambda_sqs-{{lambda-name}}" {
 
   role       = aws_iam_role.lambda-{{lambda-name}}[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
-}
-
-resource "aws_efs_access_point" "lambda-{{lambda-name}}" {
-  count = terraform.workspace == var.lambda_workspace ? 1 : 0
-
-  file_system_id = try(data.terraform_remote_state.cluster[0].outputs.aws_efs_file_system_cluster.id, null)
-
-  root_directory {
-    path = "/${var.lambda_name}"
-    creation_info {
-      owner_gid   = 1000
-      owner_uid   = 1000
-      permissions = "755"
-    }
-  }
-
-  posix_user {
-    gid = 1000
-    uid = 1000
-  }
-
-  tags = merge(var.cluster_tags, {
-    Name = "himmelsstuermer.${var.cluster_tags.cluster}.efs-ap.${var.lambda_name}"
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_efs-{{lambda-name}}" {
-  count = terraform.workspace == var.lambda_workspace ? 1 : 0
- 
-  role       = aws_iam_role.lambda-{{lambda-name}}[0].name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess"
 }
 
 resource "random_string" "secret_token-{{lambda-name}}" {
@@ -505,3 +480,7 @@ resource "null_resource" "deploy_api-{{lambda-name}}" {
 output "webhook_url" {
   value = local.webhook_url
 }
+
+
+
+# https://s3.amazonaws.com/datomic-cloud-1/cft/1126/storage-template-9340-1126.json

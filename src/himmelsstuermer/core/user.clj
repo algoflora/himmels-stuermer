@@ -1,6 +1,6 @@
 (ns himmelsstuermer.core.user
   (:require
-    [himmelsstuermer.core.db :as db]
+    [datomic.client.api :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
@@ -65,24 +65,32 @@
 ;;              {:user user :msg-id msg-id}))
 
 
-(malli/=> load-to-state [:=> [:cat spec/State spec.tg/User [:? [:maybe :uuid]]] spec/MissionaryTask])
+(malli/=> load-to-state [:=> [:cat spec/State spec.tg/User [:maybe :uuid] :boolean] spec/MissionaryTask])
 
 
 (defn load-to-state
-  ([state from] (load-to-state state from nil))
-  ([{:keys [database] :as state} from uuid]
-   (m/sp (let [query  (conj '[:find (pull ?u [*]) (pull ?cbu [*]) (pull ?cb [*])
-                              :in $ ?uid ?uuid
-                              :where
-                              [?u :user/id ?uid]
-                              [?u :user/uuid ?uuuid]
-                              [?cbu :callback/uuid ?uuuid]]
-                            (if (some? uuid)
-                              '[?cb :callback/uuid ?uuid]
-                              '[?cb :callback/uuid ?uuuid]))
+  ([{:keys [database] :as state} from uuid reset?]
+   (m/sp (let [query (if (some? uuid)
+
+                       '[:find (pull ?u [*]) (pull ?cbu [*]) (pull ?cb [*])
+                         :in $ ?uid ?uuid
+                         :where
+                         [?u :user/id ?uid]
+                         [?u :user/uuid ?uuuid]
+                         [?cbu :callback/uuid ?uuuid]
+                         [?cb :callback/uuid ?uuid]]
+
+                       '[:find (pull ?u [*]) (pull ?cbu [*]) (pull ?cb [*])
+                         :in $ ?uid
+                         :where
+                         [?u :user/id ?uid]
+                         [?u :user/uuid ?uuuid]
+                         [?cbu :callback/uuid ?uuuid]
+                         [?cb :callback/uuid ?uuuid]])
 
                [user? user-callback? callback?]
-               (first (db/q query database (:id from) uuid))
+               (first (apply d/q query database (cond-> [(:id from)]
+                                                  (some? uuid) (conj uuid))))
 
                ;; data (d/q query database (:id from) uuid)
                ;; datoms (mapv str (d/datoms database :eav))
@@ -92,14 +100,15 @@
                ;;                                   :datoms datoms
                ;;                                   :result data}})
 
-               [user tx-data]   (cond
-                                  (nil? user?)
-                                  (create (symbol disp/main-handler) from)
+               [_user tx-data]   (cond
+                                   (nil? user?)
+                                   (create (symbol disp/main-handler) from)
 
-                                  (is-new-udata? user? from)
-                                  (renew user? from)
+                                   (is-new-udata? user? from)
+                                   (renew user? from)
 
-                                  :else [user? []])
+                                   :else [user? []])
+               user             (if reset? (assoc _user :user/msg-id 0) _user)
                is-payment?      (contains? (:message state) :successful_payment)
                function         @(if is-payment? disp/payment-handler
                                      (or (disp/resolve-symbol! (:callback/function callback?))

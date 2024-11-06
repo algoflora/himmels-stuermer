@@ -477,91 +477,52 @@ resource "aws_iam_role_policy" "api_gateway_sqs" {
   })
 }
 
-# Cluster-wide EFS
-resource "aws_efs_file_system" "cluster" {
+# Datomic Cloud Storage Stack
+resource "aws_cloudformation_stack" "datomic_storage_stack" {
   count = terraform.workspace == var.cluster_workspace ? 1 : 0
 
-  creation_token = "himmelsstuermer-${var.cluster_tags.cluster}-efs"
-  encrypted      = true
+  name         = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-storage-stack"
+  template_url = "https://s3.amazonaws.com/datomic-cloud-1/cft/1126/storage-template-9340-1126.json"
 
-  tags = merge(var.cluster_tags, {
-    Name = "himmelsstuermer.${var.cluster_tags.cluster}.efs"
-  })
-}
-
-# EFS Mount Targets for each private Subnet
-resource "aws_efs_mount_target" "cluster" {
-  count = terraform.workspace == var.cluster_workspace ? length(aws_subnet.private) : 0
-
-  file_system_id  = aws_efs_file_system.cluster[0].id
-  subnet_id       = aws_subnet.private[count.index].id
-  security_groups = [aws_security_group.efs[0].id]
-}
-
-# Security Group for Mount Targets
-resource "aws_security_group" "efs" {
-  count = terraform.workspace == var.cluster_workspace ? 1 : 0
-
-  name        = "himmelsstuermer-${var.cluster_tags.cluster}-efs-sg"
-  description = "Allow NFS traffic from Lambda functions"
-  vpc_id      = aws_vpc.cluster[0].id
-
-  ingress {
-    description     = "NFS from Lambda"
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda_shared[0].id]
+  parameters = {
+    VpcId = aws_vpc.cluster[0].id
   }
 
+  capabilities = ["CAPABILITY_NAMED_IAM"]
+
   tags = merge(var.cluster_tags, {
-    Name = "himmelsstuermer.${var.cluster_tags.cluster}.sg.efs"
+    Name = "himmelsstuermer.${local.lambda_tags.cluster}.datomic.storage-stack"
   })
 }
+
+# Datomic Cloud Compute Stack
+resource "aws_cloudformation_stack" "datomic_compute_stack" {
+  count = terraform.workspace == var.cluster_workspace ? 1 : 0
+
+  name         = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-compute-stack"
+  template_url = "https://s3.amazonaws.com/datomic-cloud-1/cft/1126/compute-template-9340-1126.json"
+
+  parameters = {
+    VpcId                = aws_vpc.cluster[0].id
+    StorageStackName     = aws_cloudformation_stack.datomic_storage_stack.name
+    System               = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-system"
+    DatomicEndpointName  = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-endpoint"
+    ComputeInstanceCount = "1"
+  }
+
+  capabilities = ["CAPABILITY_NAMED_IAM"]
+
+  depends_on = [
+    aws_cloudformation_stack.datomic_storage_stack
+  ]
+
+  tags = merge(var.cluster_tags, {
+    Name = "himmelsstuermer.${local.lambda_tags.cluster}.datomic.compute-stack"
+  })
+}
+
 
 data "aws_caller_identity" "current" {}
-
-# Policy for EFS Access
-resource "aws_efs_file_system_policy" "cluster" {
-  count = terraform.workspace == var.cluster_workspace ? 1 : 0
-
-  file_system_id = aws_efs_file_system.cluster[0].id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "LambdaAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = "*"
-        }
-        Action = [
-          "elasticfilesystem:ClientMount",
-          "elasticfilesystem:ClientWrite"
-        ]
-        Resource = [aws_efs_file_system.cluster[0].arn]
-        Condition = {
-          StringLike = {
-            "aws:PrincipalArn": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/himmelsstuermer.${var.cluster_tags.cluster}.iam-role.*"
-          }
-        }
-      }
-    ]
-  })
-}
-
-# Security Groups Rule for Lambdas to EFS
-resource "aws_security_group_rule" "lambda_to_efs" {
-  count = terraform.workspace == var.cluster_workspace ? 1 : 0
-
-  type                     = "egress"
-  from_port                = 2049
-  to_port                  = 2049
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.lambda_shared[0].id
-  source_security_group_id = aws_security_group.efs[0].id
-}
 
 resource "aws_iam_user" "api_deployer" {
   count = terraform.workspace == var.cluster_workspace ? 1 : 0
@@ -595,6 +556,12 @@ resource "aws_iam_user_policy" "api_deployer" {
       },
     ]
   })
+}
+
+
+output "datomic_endpoint" {
+  value       = try(aws_cloudformation_stack.datomic_compute_stack[0].outputs["DatomicEndpoint"], null)
+  description = "The endpoint for the Datomic Cloud compute stack"
 }
 
 output "api_deployer_access_key" {
@@ -637,8 +604,4 @@ output "aws_subnet_private" {
 
 output "aws_security_group_lambda_shared" {
   value = try(aws_security_group.lambda_shared[0], null)
-}
-
-output "aws_efs_file_system_cluster" {
-  value = try(aws_efs_file_system.cluster[0], null)
 }

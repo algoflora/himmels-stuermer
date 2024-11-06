@@ -1,7 +1,7 @@
 (ns himmelsstuermer.spec.core
   (:require
+    [datomic.client.api.protocols :as protocols]
     [himmelsstuermer.api.buttons :as b]
-    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.impl.transactor]
     [himmelsstuermer.spec.telegram :as spec.tg]))
 
@@ -74,7 +74,7 @@
   [:map {:closed true}
    [:profile :keyword]
    [:system [:map {:closed true}
-             [:db-conn [:fn db/is-conn?]]]]
+             [:db-conn [:fn #(satisfies? protocols/Connection %)]]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
           [:roles [:map-of :keyword [:set [:or :int :string]]]]
@@ -82,7 +82,7 @@
    [:project [:map {:closed true}
               [:name :string]
               [:config :map]]]
-   [:database [:maybe [:fn db/is-db?]]]
+   [:database [:maybe [:fn #(satisfies? protocols/Db %)]]]
    [:action [:maybe Action]]
    [:update [:maybe spec.tg/Update]]
    [:message [:maybe spec.tg/Message]]
@@ -104,7 +104,7 @@
           [:default-language-code :keyword]]]
    [:prf :keyword]
    [:cfg :map]
-   [:idb [:fn db/is-db?]]
+   [:idb [:fn #(satisfies? protocols/Db %)]]
    [:txs [:fn #(satisfies? himmelsstuermer.impl.transactor/TransactionsAccumulator %)]]
    [:msg [:maybe spec.tg/Message]]
    [:cbq [:maybe spec.tg/CallbackQuery]]

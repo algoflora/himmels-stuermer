@@ -3,6 +3,7 @@
     [clojure.java.io :as io]
     [clojure.string :as str]
     [himmelsstuermer.aws.common :refer [stream-to-out]]
+    [himmelsstuermer.misc :refer [project-info]]
     [me.raynes.fs :as fs])
   (:import
     (java.lang
@@ -46,11 +47,13 @@
                            (:lambda-name opts))
         image-tag  (current-datetime)
         packages   (format "AUX_PACKAGES=%s" (str/join " " (map str (:aux-packages opts))))
+        name       (format "PROJECT_NAME=%s" (:name (project-info)))
         arch       (format "TARGET_ARCH=%s" (:arch opts))
         arch-2     (format "TARGET_ARCH_2=%s" (if (= "arm64" (:arch opts)) "aarch64" (:arch opts)))
         command (-> ["docker" "build"
                      "-t" (format "%s:%s" image-name image-tag)
                      "-f" (dockerfile-to-temp)
+                     "--build-arg" name
                      "--build-arg" packages
                      "--build-arg" arch
                      "--build-arg" arch-2]

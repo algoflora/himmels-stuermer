@@ -4,8 +4,8 @@
     [cheshire.core :as json]
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
+    [datomic.client.api.protocols :as protocols]
     [himmelsstuermer.core.config :as conf]
-    [himmelsstuermer.core.db :as db]
     [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
     [me.raynes.fs :as fs]
@@ -71,7 +71,7 @@
   (cond-> obj
     (instance? Throwable obj) throwable->map
 
-    (db/is-db? obj) ((constantly "<DATAHIKE DB>"))
+    ;; (satisfies? protocols/Db obj) ((constantly "<DATOMIC DB>"))
 
     (or (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str
@@ -103,7 +103,7 @@
         (tt/add-handler! :console-json (console-json-handler)))
       (when (= :test profile)
         (tt/add-handler! :console-event-id (console-event-id-handler))
-        ;; (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
+        (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
         (tt/add-handler! :file-edn-disposable (file-edn-disposable-handler)))
       (tt/set-ctx! {:project project-info :profile profile})
       (tt/set-middleware! (fn [signal]

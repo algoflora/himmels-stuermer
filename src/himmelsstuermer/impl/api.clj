@@ -318,6 +318,7 @@
           (try (api-task state :deleteMessage {:chat_id (:user/id user)
                                                :message_id mid})
                (catch Exception exc
+                 (println "DELETE_MESSAGE_EXCEPTION" (ex-data exc))
                  (when (not= 400 (-> exc ex-data :status))
                    (throw (ex-info "Request to :deleteMessage failed!"
                                    {:event ::delete-message-error

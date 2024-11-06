@@ -2,8 +2,10 @@
   (:require
     [clojure.edn :as edn]
     [clojure.java.io :as io]
+    [datomic.client.api :as d]
     [himmelsstuermer.core.config :as conf]
-    [himmelsstuermer.core.db :as db]
+    [himmelsstuermer.misc :as misc]
+    [me.raynes.fs :as fs]
     [missionary.core :as m]
     [taoensso.telemere :as tt]))
 
@@ -15,22 +17,45 @@
       edn/read-string))
 
 
+(defn- database-exists?
+  "Checks if a database with the given name exists in Datomic Cloud."
+  [client db-name]
+  (let [dbs (d/list-databases client {})]
+    (some #(= db-name %) dbs)))
+
+
 (def db-conn
   ;; TODO: Check why it is loaded multiple times
 
-  (m/sp (let [cfg    (or (:db/conf (m/? conf/config))
-                         {:backend  :mem
-                          :id       (System/getProperty "himmelsstuermer.test.database.id"
-                                                        (str (random-uuid)))})
+  (m/sp (let [client-config (case @conf/profile
+                              :test
+                              {:server-type :datomic-local
+                               :system (System/getProperty "himmelsstuermer.test.database.id"
+                                                           (str (random-uuid)))
+                               :storage-dir :mem}
+
+                              :aws
+                              {:server-type :cloud
+                               :region (System/getenv "AWS_REGION")
+                               :system (System/getenv "DATOMIC_SYSTEM")
+                               :endpoint (System/getenv "DATOMIC_ENDPOINT")
+                               :proxy-port 8182})
+
+              db-name (:name (misc/project-info))
+
               schema (into himmelsstuermer-schema
                            (or (some->> "schema.edn" io/resource slurp read-string) []))
 
-              conn   (do (when-not (db/db-exists? cfg)
-                           (let [db (db/create-db cfg schema)]
-                             (tt/event! ::database-created {:data {:database db}})))
-                         (db/connect cfg schema))]
-          (tt/event! ::init-db-conn {:data {:store-config cfg
+              client (d/client client-config)
+
+              conn   (do (when-not (database-exists? client db-name)
+                           (d/create-database client {:db-name db-name})
+                           (tt/event! ::database-created {:data {:db-name db-name}}))
+                         (d/connect client {:db-name db-name}))]
+          (d/transact conn {:tx-data schema})
+          (tt/event! ::init-db-conn {:data {:client-config client-config
                                             :schema schema
+                                            :db-name db-name
                                             :connection conn}})
           {:db/conn conn})))
 

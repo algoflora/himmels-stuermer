@@ -4,7 +4,7 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [clojure.walk :refer [postwalk]]
-    [himmelsstuermer.core.db :as db]
+    [datomic.client.api :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.init]
     [himmelsstuermer.core.logging :refer [init-logging! reset-nano-timer! throwable->map]]
@@ -33,13 +33,17 @@
 (defmethod handle-update- :message
   [_ {:keys [message] :as state}]
   (m/sp (tt/event! ::handle-message {:data {:message message}})
-        (let [state' (m/? (u/load-to-state state (:from message)))]
-          (s/modify-state state' #(update
-                                    % :tasks
-                                    conj (m/via m/blk (m/?
-                                                        (api/delete-message (s/construct-user-state state')
-                                                                            (:user state')
-                                                                            (:message_id message)))))))))
+        (if (= "private" (-> message :chat :type))
+          (let [state' (m/? (u/load-to-state state (:from message) nil (= "/start" (:text message))))]
+            (s/modify-state state' #(update
+                                      % :tasks
+                                      conj (m/via m/blk (m/?
+                                                          (api/delete-message (s/construct-user-state state')
+                                                                              (:user state')
+                                                                              (:message_id message)))))))
+          (let [exc (ex-info "Message from non-private chat!" {:message message})]
+            (tt/error! {:id ::non-private-chat-message
+                        :data (throwable->map exc)} exc)))))
 
 
 (defmethod handle-update- :callback-query
@@ -47,7 +51,7 @@
   (tt/event! ::handle-callback-query {:data {:callback-query callback-query}})
   (u/load-to-state state (:from callback-query) (-> callback-query
                                                     :data
-                                                    java.util.UUID/fromString)))
+                                                    java.util.UUID/fromString) false))
 
 
 (defmethod handle-update- :pre-checkout-query ; TODO: Add comprehensive processing of pre-checkout-query
@@ -97,7 +101,7 @@
 
 (defn load-database
   [s]
-  (let [state (s/modify-state s #(assoc % :database @(-> s :system :db-conn)))
+  (let [state (s/modify-state s #(assoc % :database (-> s :system :db-conn d/db)))
         db    (:database state)]
     (tt/event! ::loaded-database {:data {:database (str db)}})
     state))
@@ -150,7 +154,7 @@
   [state tx-set]
   (m/via m/blk
          (tt/event! ::persisting-data {:data {:tx-set tx-set}})
-         (db/transact state tx-set)))
+         (d/transact (-> state :system :db-conn) {:tx-data (seq tx-set)})))
 
 
 (defn- execute-business-logic
@@ -160,7 +164,7 @@
            (tt/event! ::executing-fallback {:data {:tasks tasks}})
            (tt/event! ::executing-business-logic {:data {:tasks tasks}}))
          (try (let [tx-set    (m/? (perform-tasks state tasks))
-                    tx-report (sort-by first (map seq (:tx-data (m/? (persist-data state tx-set)))))]
+                    tx-report (sort (map str (:tx-data (m/? (persist-data state tx-set)))))]
                 (tt/event! ::execute-finished {:data {:tx-set tx-set
                                                       :tx-report tx-report}}))
               (catch Exception exc
@@ -204,10 +208,11 @@
 
 (def invocations
   (m/seed (repeatedly
-            (m/via m/blk (let [url (runtime-api-url "invocation/next")]
-                           (tt/event! ::invocation-next-request {:data {:url url
-                                                                        :timeout timeout-ms}})
-                           @(http/get url {:timeout timeout-ms}))))))
+            (fn []
+              (m/via m/blk (let [url (runtime-api-url "invocation/next")]
+                             (tt/event! ::invocation-next-request {:data {:url url
+                                                                          :timeout timeout-ms}})
+                             @(http/get url {:timeout timeout-ms})))))))
 
 
 (def events
@@ -264,6 +269,10 @@
 
 (comment
 
+  (def t (m/via m/blk (+ 1 2 3)))
+
+  (m/? t)
+  
   (def fl (m/seed (repeatedly 3 (fn [] (m/via m/blk
                                          (println "REQUEST")
                                          @(http/get "http://ifconfig.me"))))))

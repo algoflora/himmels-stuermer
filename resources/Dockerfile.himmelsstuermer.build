@@ -6,6 +6,7 @@ ARG GRAALVM_VERSION=23
 ARG TARGET_ARCH=arm64
 ARG TARGET_ARCH_2=aarch64
 ARG AUX_PACKAGES=""
+ARG PROJECT_NAME="app"
 
 # Install necessary packages
 
@@ -49,8 +50,8 @@ RUN lein
 
 # Copy project
 
-COPY . /app
-WORKDIR /app
+COPY . "/$PROJECT_NAME"
+WORKDIR "/$PROJECT_NAME"
 
 # Simple test
 
