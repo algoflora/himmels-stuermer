@@ -4,7 +4,8 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [clojure.walk :refer [postwalk]]
-    [datomic.client.api :as d]
+    [datascript.core :as d]
+    [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.init]
     [himmelsstuermer.core.logging :refer [init-logging! reset-nano-timer! throwable->map]]
@@ -41,9 +42,10 @@
                                                           (api/delete-message (s/construct-user-state state')
                                                                               (:user state')
                                                                               (:message_id message)))))))
-          (let [exc (ex-info "Message from non-private chat!" {:message message})]
+          (let [exc     (ex-info "Message from non-private chat!" {:message message})
+                exc-map (throwable->map exc)]
             (tt/error! {:id ::non-private-chat-message
-                        :data (throwable->map exc)} exc)))))
+                        :data exc-map} exc)))))
 
 
 (defmethod handle-update- :callback-query
@@ -96,15 +98,18 @@
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
-(malli/=> load-database [:-> spec/State spec/State])
+(malli/=> load-database [:-> spec/State spec/MissionaryTask])
 
 
 (defn load-database
-  [s]
-  (let [state (s/modify-state s #(assoc % :database (-> s :system :db-conn d/db)))
-        db    (:database state)]
-    (tt/event! ::loaded-database {:data {:database (str db)}})
-    state))
+  [{:keys [storage schema] :as s}]
+  (m/via m/blk (let [db (or (d/restore storage) (-> schema d/create-conn deref))
+                     _ (tt/event! ::restored-db {:data {:db db}})
+                     state (s/modify-state s #(assoc % :database
+                                                     (d/with-schema db schema)))
+                     db    (:database state)]
+                 (tt/event! ::loaded-database {:data {:database db}})
+                 state)))
 
 
 (malli/=> handle-record [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
@@ -112,8 +117,9 @@
 
 (defn- handle-record
   [s record]
-  (m/sp (let [body  (-> record :body json-decode)
-              state (load-database s)]
+  (m/sp (let [[body state] (m/? (m/join vector
+                                        (m/sp (-> record :body json-decode))
+                                        (load-database s)))]
           (cond
             (malli/validate spec.tg/Update body)
             (m/? (handle-update (s/modify-state state #(assoc % :update body))))
@@ -147,14 +153,26 @@
                     tasks))))
 
 
+(defn- filter-tx-set
+  [{:keys [user]} tx-set]
+  (if (< 1 (count (filter #(= (:user/uuid user) (:callback/uuid %)) tx-set)))
+    (into #{} (filter #(not (and (= (:user/uuid user) (:callback/uuid %))
+                                 (= (symbol disp/main-handler) (:callback/function %))
+                                 (= {} (:callback/arguments %))))) tx-set)
+    tx-set))
+
+
 (malli/=> persist-data [:=> [:cat spec/State [:set [:or :map [:vector :any]]]] spec/MissionaryTask]) ; TODO: Transaction spec?
 
 
 (defn- persist-data
-  [state tx-set]
-  (m/via m/blk
-         (tt/event! ::persisting-data {:data {:tx-set tx-set}})
-         (d/transact (-> state :system :db-conn) {:tx-data (seq tx-set)})))
+  [{:keys [database storage] :as state} tx-set]
+  (let [filtered-tx-set (filter-tx-set state tx-set)]
+    (m/via m/blk
+           (tt/event! ::persisting-data {:data {:tx-set filtered-tx-set}})
+           (-> database
+               (d/db-with (seq filtered-tx-set))
+               (d/store storage)))))
 
 
 (defn- execute-business-logic
@@ -235,16 +253,27 @@
                                       (tt/event! ::record-processed)
                                       #_(tt/set-ctx! (assoc tt/*ctx* :state state))))))
 
-               (let [aws-response @(http/post (runtime-api-url (format "invocation/%s/response" id))
-                                              {:body "OK"})]
+               (let [aws-response (case @conf/profile
+                                    :test
+                                    "TEST RESPONSE" ; TODO: Create HTTP-mock fixture!
+                                    :aws
+                                    (m/? (m/via m/blk
+                                                @(http/post (runtime-api-url (format "invocation/%s/response" id))
+                                                            {:body "OK"}))))]
                  (tt/event! ::invocation-response-ok {:data {:invocation-id id
                                                              :aws-response  aws-response}}))
 
 
                (catch Exception exc
                  (let [exc-map (throwable->map exc)
-                       aws-response (http/post (runtime-api-url (format "invocation/%s/error" id))
-                                               {:body (json/encode (throwable->error-body exc))})]
+                       aws-response (case @conf/profile
+                                      :test
+                                      "TEST RESPONSE"
+                                      :aws
+                                      (m/? (m/via m/blk
+                                                  @(http/post (runtime-api-url (format "invocation/%s/error" id))
+                                                              {:body
+                                                               (json/encode (throwable->error-body exc))}))))]
                    (tt/error! {:id   ::unhandled-exception
                                :data {:invocation-id id
                                       :error         exc-map

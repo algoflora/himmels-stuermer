@@ -1,6 +1,6 @@
 (ns himmelsstuermer.core.user
   (:require
-    [datomic.client.api :as d]
+    [datascript.core :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
@@ -23,12 +23,13 @@
 
 (defn- renew
   [user udata]
-  (let [user' (assoc user ; TODO: Atmodalt to minimize transaction data
-                     :user/username (:usernam udata)
+  (let [user' (assoc user ; TODO: Attemp to minimize transaction data
+                     :user/username (:username udata)
                      :user/first-name (:first_name udata)
                      :user/last-name (:last_name udata)
                      :user/language-code (:language_code udata))]
-    (tt/event! ::user-renew {:old-user user :new-user user'})
+    (tt/event! ::user-renew {:data {:old-user user
+                                    :new-user user'}})
     [user' (into {} (filter #(-> % second some?)) user')]))
 
 
@@ -51,7 +52,7 @@
     [user [user
            {:callback/uuid uuid
             :callback/function handler-main
-            :callback/arguments (prn-str {})
+            :callback/arguments {}
             :callback/user -1
             :callback/service? false}]]))
 
@@ -100,29 +101,29 @@
                ;;                                   :datoms datoms
                ;;                                   :result data}})
 
-               [_user tx-data]   (cond
-                                   (nil? user?)
-                                   (create (symbol disp/main-handler) from)
+               [_user tx-data] (cond
+                                 (nil? user?)
+                                 (create (symbol disp/main-handler) from)
 
-                                   (is-new-udata? user? from)
-                                   (renew user? from)
+                                 (is-new-udata? user? from)
+                                 (renew user? from)
 
-                                   :else [user? []])
-               user             (if reset? (assoc _user :user/msg-id 0) _user)
-               is-payment?      (contains? (:message state) :successful_payment)
-               function         @(if is-payment? disp/payment-handler
-                                     (or (disp/resolve-symbol! (:callback/function callback?))
-                                         disp/main-handler))
-               arguments        (read-string (or (:callback/arguments callback?) "{}"))]
+                                 :else [user? []])
+               user            (if reset? (assoc _user :user/msg-id 0) _user)
+               is-payment?     (contains? (:message state) :successful_payment)
+               function        @(if is-payment? disp/payment-handler
+                                    (or (disp/resolve-symbol! (:callback/function callback?))
+                                        disp/main-handler))
+               arguments       (or (:callback/arguments callback?) {})]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
                                     (and (or (not=   (symbol disp/main-handler)
                                                      (:callback/function user-callback?))
-                                             (seq (read-string (:callback/arguments user-callback?))))
+                                             (seq (:callback/arguments user-callback?)))
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
                                                                :callback/function (symbol disp/main-handler)
-                                                               :callback/arguments (prn-str {})})
+                                                               :callback/arguments {}})
 
                                     :always (->
                                               (assoc :user user)

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "java.util.UUID[]",
+    "unsafeAllocated": true
+  },
+  {
+    "name": "clojure.lang.PersistentHashSet[]",
+    "unsafeAllocated": true
+  }
+]

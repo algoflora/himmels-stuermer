@@ -1,7 +1,7 @@
 (ns himmelsstuermer.impl.callbacks
   (:gen-class)
   (:require
-    [datomic.client.api :as d]
+    [datascript.core :as d]
     [himmelsstuermer.impl.transactor :refer [transact!]]
     [himmelsstuermer.spec.core :as spec]
     [malli.core :as malli]
@@ -32,7 +32,7 @@
    (let [args (or args {})
          tx-data [{:callback/uuid uuid
                    :callback/function f
-                   :callback/arguments (prn-str args)
+                   :callback/arguments args
                    :callback/service? is-service
                    :callback/user (:db/id user)}]]
      (transact! txs tx-data)

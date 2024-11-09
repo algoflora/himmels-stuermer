@@ -21,7 +21,8 @@
   [profile & args]
   (let [data (apply merge args)]
     {:profile profile
-     :system {:db-conn (:db/conn data)}
+     :storage (:db/storage data)
+     :schema (:db/schema data)
      :bot {:token (:bot/token data)
            :roles (:bot/roles data)
            :default-language-code (:bot/default-language-code data)}
@@ -82,7 +83,8 @@
                               (throw (tt/error! {:id type
                                                  :data data'} exception))))}))
           (let [state (m/? (m/join (partial create-state profile)
-                                   init/db-conn
+                                   init/db-schema
+                                   init/db-storage
                                    init/bot-token
                                    init/bot-default-language-code
                                    init/bot-roles

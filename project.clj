@@ -13,7 +13,8 @@
                  [org.clojure/clojure "1.12.0"]
                  [selmer "1.12.61"]
                  [tick/tick "1.0"]
-                 [com.datomic/client-cloud "1.0.130"]]
+                 [datascript "1.7.3"]
+                 [com.github.igrishaev/dynamodb "0.1.4"]]
 
   :plugins [[jonase/eastwood "1.4.3"]
             [lein-ancient "1.0.0-RC3"]
@@ -30,8 +31,7 @@
 
   :profiles {:test      {:source-paths ["src" "test"]
                          :resource-paths ["resources" "test/resources"]
-                         :dependencies [[com.datomic/local "1.0.285"]
-                                        [lambdaisland/kaocha "1.91.1392"
+                         :dependencies [[lambdaisland/kaocha "1.91.1392"
                                          :exclusions [net.incongru.watchservice/barbary-watchservice]]]
                          :jvm-opts ["-Dhimmelsstuermer.malli.instrument=true"
                                     "-Dhimmelsstuermer.profile=test"]}

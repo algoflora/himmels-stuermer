@@ -53,6 +53,10 @@ RUN lein
 COPY . "/$PROJECT_NAME"
 WORKDIR "/$PROJECT_NAME"
 
+# Run DynamoDB local
+
+RUN java -jar ./test/resources/dynamodb/DynamoDBLocal.jar -inMemory &
+
 # Simple test
 
 ENV HIMMELSSTUERMER_PROFILE=test

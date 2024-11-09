@@ -2,6 +2,8 @@
 
 printf "\n\nBuild start...\n\n" &&
 
+    java -jar ./test/resources/dynamodb/DynamoDBLocal.jar -inMemory &
+
     export HIMMELSSTUERMER_PROFILE=test &&
     lein test &&
 
@@ -9,7 +11,6 @@ printf "\n\nBuild start...\n\n" &&
     
     # lein clean &&
     # lein with-profiles +test,+uber-test uberjar &&
-    # # lein with-profiles +uber uberjar &&
     # java -agentlib:native-image-agent=config-output-dir=./ -jar target/uberjar/himmelsstuermer-test.jar &&
 
     # printf "\n\nAdding reachability-metadata.json to META-INF...\n\n" &&
@@ -23,7 +24,7 @@ printf "\n\nBuild start...\n\n" &&
     
     printf "\n\nTesting native image...\n\n" &&
 
-    ./target/test+uber-test+native/himmelsstuermer-native
+    ./target/test+uber-test+native/lambda
 
     # printf "\n\nBuilding native image...\n\n" &&
 
@@ -32,6 +33,6 @@ printf "\n\nBuild start...\n\n" &&
 
     # printf "\n\nRunning native image... (must fail!)\n\n" &&
     
-    # ./target/uber+native/himmelsstuermer-native
+    # ./target/uber+native/lambda
 
 bash

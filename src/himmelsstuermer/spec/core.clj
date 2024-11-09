@@ -1,6 +1,7 @@
 (ns himmelsstuermer.spec.core
   (:require
-    [datomic.client.api.protocols :as protocols]
+    [datascript.core :as d]
+    [datascript.storage :refer [IStorage]]
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.impl.transactor]
     [himmelsstuermer.spec.telegram :as spec.tg]))
@@ -73,8 +74,8 @@
 (def State
   [:map {:closed true}
    [:profile :keyword]
-   [:system [:map {:closed true}
-             [:db-conn [:fn #(satisfies? protocols/Connection %)]]]]
+   [:storage [:fn #(satisfies? IStorage %)]]
+   [:schema [:map-of :keyword [:map-of :keyword [:or :keyword :string :boolean]]]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
           [:roles [:map-of :keyword [:set [:or :int :string]]]]
@@ -82,7 +83,7 @@
    [:project [:map {:closed true}
               [:name :string]
               [:config :map]]]
-   [:database [:maybe [:fn #(satisfies? protocols/Db %)]]]
+   [:database [:maybe [:fn d/db?]]]
    [:action [:maybe Action]]
    [:update [:maybe spec.tg/Update]]
    [:message [:maybe spec.tg/Message]]
@@ -104,7 +105,7 @@
           [:default-language-code :keyword]]]
    [:prf :keyword]
    [:cfg :map]
-   [:idb [:fn #(satisfies? protocols/Db %)]]
+   [:idb [:fn d/db?]]
    [:txs [:fn #(satisfies? himmelsstuermer.impl.transactor/TransactionsAccumulator %)]]
    [:msg [:maybe spec.tg/Message]]
    [:cbq [:maybe spec.tg/CallbackQuery]]

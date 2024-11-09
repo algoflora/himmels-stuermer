@@ -4,7 +4,7 @@
     [cheshire.core :as json]
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
-    [datomic.client.api.protocols :as protocols]
+    [datascript.core :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
@@ -71,7 +71,7 @@
   (cond-> obj
     (instance? Throwable obj) throwable->map
 
-    ;; (satisfies? protocols/Db obj) ((constantly "<DATOMIC DB>"))
+    (d/db? obj) ((constantly "<DATASCRIPT DB>"))
 
     (or (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str
