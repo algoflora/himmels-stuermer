@@ -40,8 +40,9 @@
   [table-name {:keys [public-key secret-key endpoint region] :as opts}]
   (tt/event! ::get-storage {:data opts})
   (let [client (api/make-client public-key secret-key endpoint region)
+        _ (println "CLIENT" client)
         tables (api/list-tables client {:limit 100})] ; TODO: Implement getting all tables
-
+    (println "TABLES" tables)
     ;; TODO: Serialization?
     (when (nil? ((set (:TableNames tables)) table-name))
       (let [resp (api/create-table client table-name

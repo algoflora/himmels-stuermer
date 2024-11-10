@@ -1,8 +1,4 @@
-{:db/conf #profile {:aws  {:backend  :file
-                           :path     "/mnt/efs/dthk"}
-                    :test nil}
-
- :bot/default-language-code :en
+{:bot/default-language-code :en
 
  :bot/roles {}
 

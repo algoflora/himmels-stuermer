@@ -11,6 +11,7 @@
    :lambda-memory-size 2048
    ;; :lambda-name
    ;; :cluster
+   ;; :region
    :lambda-timeout 15
    :aux-files #{}
    :aux-packages #{}

@@ -29,16 +29,16 @@
   (m/via m/blk (let [client-opts (case @conf/profile
                                    :test test-client-opts
 
-                                   :aws {:public-key (System/getenv "AWS_PUBLIC_KEY")
-                                         :secret-key (System/getenv "AWS_SECRET_KEY")
-                                         :endpoint   (System/getenv "AWS_DYNAMODB_ENDPOINT")
+                                   :aws {:public-key (System/getenv "DYNAMODB_PUBLIC_KEY")
+                                         :secret-key (System/getenv "DYNAMODB_SECRET_KEY")
+                                         :endpoint   (System/getenv "DYNAMODB_ENDPOINT")
                                          :region     (System/getenv "AWS_REGION")})
 
                      table-name  (case @conf/profile
                                    :test (str (:name (misc/project-info)) "-"
                                               (System/getProperty "himmelsstuermer.test.database.id"
                                                                   (str (random-uuid))))
-                                   :aws  (:name (misc/project-info)))
+                                   :aws (System/getenv "DYNAMODB_TABLE_NAME"))
 
                      storage     (get-storage table-name client-opts)]
                  (tt/event! ::init-db-storage {:data {:client-options client-opts

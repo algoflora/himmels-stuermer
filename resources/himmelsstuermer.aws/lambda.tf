@@ -85,9 +85,10 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
 
   environment {
     variables = {
-      DATOMIC_ENDPOINT = data.terraform_remote_state.cluster[0].outputs.datomic_endpoint
-      AWS_REGION       = var.region
-      DATOMIC_SYSTEM   = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-system"
+      DYNAMODB_PUBLIC_KEY = data.terraform_remote_state.cluster[0].outputs.dynamodb_user_access_key
+      DYNAMODB_SECRET_KEY = data.terraform_remote_state.cluster[0].outputs.dynamodb_user_secret_key
+      DYNAMODB_ENDPOINT   = "https://${data.aws_caller_identity.current.account_id}.ddb.${var.region}.amazonaws.com"
+      DYNAMODB_TABLE_NAME = aws_dynamodb_table.dynamodb_table-{{lambda-name}}[0].name
   {% for i in lambda-env-vars %}
       {{i.key}} = "{{i.val}}"
   {% endfor %}
@@ -100,6 +101,24 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
     Name = "himmelsstuermer.${local.lambda_tags.cluster}.lambda.${var.lambda_name}"
   })
 }
+
+resource "aws_dynamodb_table" "dynamodb_table-{{lambda-name}}" {
+  count = terraform.workspace == var.lambda_workspace ? 1 : 0
+
+  name           = "${local.lambda_tags.cluster}-${var.lambda_name}"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "addr"
+
+  attribute {
+    name = "addr"
+    type = "N"
+  }
+
+  tags = merge(local.lambda_tags, {
+    Name = "himmelsstuermer.${local.lambda_tags.cluster}.dynamodb_table.${var.lambda_name}"
+  })
+}
+
 
 # SQS Queue for the Lambda function
 resource "aws_sqs_queue" "lambda_queue-{{lambda-name}}" {
@@ -365,7 +384,6 @@ resource "aws_iam_policy" "lambda-{{lambda-name}}" {
       {
         Effect   = "Allow"
         Action   = [
-          "datomic:*",
           "dynamodb:*",
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
@@ -480,7 +498,3 @@ resource "null_resource" "deploy_api-{{lambda-name}}" {
 output "webhook_url" {
   value = local.webhook_url
 }
-
-
-
-# https://s3.amazonaws.com/datomic-cloud-1/cft/1126/storage-template-9340-1126.json

@@ -1,13 +1,13 @@
 terraform {
   backend "s3" {
-    bucket = "{{tfstate-bucket}}"
-    key    = "{{cluster}}/terraform.tfstate"
+    bucket  = "{{tfstate-bucket}}"
+    key     = "{{cluster}}/terraform.tfstate"
     encrypt = true
   }
 
   required_providers {
     aws = {
-      source = "hashicorp/aws"
+      source  = "hashicorp/aws"
       version = "5.70.0"
     }
     random = {
@@ -26,7 +26,6 @@ variable "image_name" {}
 variable "image_tag" {}
 
 variable "bot_token" {}
-
 variable "cluster_workspace" {
   type = string
   default = "himmelsstuermer-cluster-{{cluster}}"
@@ -477,52 +476,50 @@ resource "aws_iam_role_policy" "api_gateway_sqs" {
   })
 }
 
-# Datomic Cloud Storage Stack
-resource "aws_cloudformation_stack" "datomic_storage_stack" {
-  count = terraform.workspace == var.cluster_workspace ? 1 : 0
-
-  name         = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-storage-stack"
-  template_url = "https://s3.amazonaws.com/datomic-cloud-1/cft/1126/storage-template-9340-1126.json"
-
-  parameters = {
-    VpcId = aws_vpc.cluster[0].id
-  }
-
-  capabilities = ["CAPABILITY_NAMED_IAM"]
-
-  tags = merge(var.cluster_tags, {
-    Name = "himmelsstuermer.${local.lambda_tags.cluster}.datomic.storage-stack"
-  })
-}
-
-# Datomic Cloud Compute Stack
-resource "aws_cloudformation_stack" "datomic_compute_stack" {
-  count = terraform.workspace == var.cluster_workspace ? 1 : 0
-
-  name         = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-compute-stack"
-  template_url = "https://s3.amazonaws.com/datomic-cloud-1/cft/1126/compute-template-9340-1126.json"
-
-  parameters = {
-    VpcId                = aws_vpc.cluster[0].id
-    StorageStackName     = aws_cloudformation_stack.datomic_storage_stack.name
-    System               = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-system"
-    DatomicEndpointName  = "himmelsstuermer-${var.cluster_tags.cluster}-datomic-endpoint"
-    ComputeInstanceCount = "1"
-  }
-
-  capabilities = ["CAPABILITY_NAMED_IAM"]
-
-  depends_on = [
-    aws_cloudformation_stack.datomic_storage_stack
-  ]
-
-  tags = merge(var.cluster_tags, {
-    Name = "himmelsstuermer.${local.lambda_tags.cluster}.datomic.compute-stack"
-  })
-}
-
-
 data "aws_caller_identity" "current" {}
+
+# DynamoDB user
+
+resource "aws_iam_user" "dynamodb_user" {
+  count = terraform.workspace == var.cluster_workspace ? 1 : 0
+
+  name = "himmelsstuermer-${var.cluster_tags.cluster}-dynamodb-user"
+}
+
+resource "aws_iam_access_key" "dynamodb_user" {
+  count = terraform.workspace == var.cluster_workspace ? 1 : 0
+
+  user = aws_iam_user.dynamodb_user[0].name
+}
+
+resource "aws_iam_user_policy" "dynamodb_user_policy" {
+  count = terraform.workspace == var.cluster_workspace ? 1 : 0
+
+  name = "dynamodb-access-policy-${var.cluster_tags.cluster}"
+  user = aws_iam_user.dynamodb_user[0].name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:BatchGetItem",
+          "dynamodb:DescribeTable"
+        ]
+        Resource = "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/*"
+      }
+    ]
+  })
+}
+
+# API Deployer User
 
 resource "aws_iam_user" "api_deployer" {
   count = terraform.workspace == var.cluster_workspace ? 1 : 0
@@ -558,10 +555,14 @@ resource "aws_iam_user_policy" "api_deployer" {
   })
 }
 
+output "dynamodb_user_access_key" {
+  value     = try(aws_iam_access_key.dynamodb_user[0].id, null)
+  sensitive = true
+}
 
-output "datomic_endpoint" {
-  value       = try(aws_cloudformation_stack.datomic_compute_stack[0].outputs["DatomicEndpoint"], null)
-  description = "The endpoint for the Datomic Cloud compute stack"
+output "dynamodb_user_secret_key" {
+  value     = try(aws_iam_access_key.dynamodb_user[0].secret, null)
+  sensitive = true
 }
 
 output "api_deployer_access_key" {

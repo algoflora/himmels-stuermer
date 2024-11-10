@@ -53,21 +53,19 @@ RUN lein
 COPY . "/$PROJECT_NAME"
 WORKDIR "/$PROJECT_NAME"
 
-# Run DynamoDB local
-
-RUN java -jar ./test/resources/dynamodb/DynamoDBLocal.jar -inMemory &
-
 # Simple test
 
 ENV HIMMELSSTUERMER_PROFILE=test
-RUN --mount=type=cache,target=/root/.m2 lein test
+RUN --mount=type=cache,target=/root/.m2 java -jar ./test/resources/dynamodb/DynamoDBLocal.jar -inMemory & \
+    sleep 3 && lein test
 
 # Native image test
 
 RUN lein clean
 RUN --mount=type=cache,target=/root/.m2 lein with-profiles +test,+uber-test,+native native-image
 RUN cp -r ./.himmelsstuermer.build/. ./target/test+uber-test+native/
-RUN ./target/test+uber-test+native/lambda
+RUN java -jar ./test/resources/dynamodb/DynamoDBLocal.jar -inMemory & \
+    sleep 5 && ./target/test+uber-test+native/lambda
 
 # Native image build
 
