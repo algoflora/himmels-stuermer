@@ -69,7 +69,7 @@
 (defn- walk
   [obj]
   (cond-> obj
-    (instance? Throwable obj) throwable->map
+    ;; (instance? Throwable obj) throwable->map
 
     (d/db? obj) ((constantly "<DATASCRIPT DB>"))
 

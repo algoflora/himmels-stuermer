@@ -19,6 +19,8 @@
 
                  [datascript "1.7.3"]
                  [com.github.igrishaev/dynamodb "0.1.2"]
+                 [com.taoensso/nippy "3.5.0-RC1"]
+                 [org.clojure/data.codec "0.1.1"]
                  [com.amazonaws/aws-lambda-java-runtime-interface-client "2.6.0"]]
 
   :plugins [[jonase/eastwood "1.4.3"]

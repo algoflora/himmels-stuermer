@@ -507,6 +507,7 @@ resource "aws_iam_user_policy" "dynamodb_user_policy" {
         Effect = "Allow"
         Action = [
           "dynamodb:CreateTable",
+          "dynamodb:ListTables",
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:Query",

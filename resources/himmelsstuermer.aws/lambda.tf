@@ -123,10 +123,10 @@ resource "aws_dynamodb_table" "dynamodb_table-{{lambda-name}}" {
 
   name           = "${local.lambda_tags.cluster}-${var.lambda_name}"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "addr"
+  hash_key       = "Addr"
 
   attribute {
-    name = "addr"
+    name = "Addr"
     type = "N"
   }
 

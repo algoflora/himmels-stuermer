@@ -13,7 +13,6 @@
     [himmelsstuermer.impl.api :as api]
     [himmelsstuermer.impl.error :as err]
     [himmelsstuermer.impl.transactor :refer [get-txs]]
-    [himmelsstuermer.misc :refer [do-nanos*]]
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
@@ -228,15 +227,6 @@
    :stackTrace   (mapv str (.getStackTrace t))})
 
 
-;; (def invocations
-;;   (m/seed (repeatedly
-;;             (fn []
-;;               (m/via m/blk (let [url (runtime-api-url "invocation/next")]
-;;                              (tt/event! ::invocation-next-request {:data {:url url
-;;                                                                           :timeout timeout-ms}})
-;;                              @(http/get url {:timeout timeout-ms})))))))
-
-
 (defn events
   [records ^Context context]
   (m/sp (let [initial-state (m/? s/state)
@@ -272,7 +262,6 @@
 (defn run
   [& args]
   (reset-nano-timer!)
-  ;; (init-logging!)
   (tt/event! ::start-main {:let [env (System/getenv)]
                            :data {:main "-main"
                                   :args args
@@ -283,15 +272,3 @@
 (defn -main
   [& args]
   (apply run args))
-
-
-(comment
-
-  (require '[missionary.core :as m])
-
-  (def b (m/via m/blk (/ 1 0) (m/? (m/sleep 500 :yo))))
-
-  
-  (m/? (m/join vector (m/sp :a) b))
-  
-  )
