@@ -80,16 +80,17 @@
 
 
 (def Invoice
-  [:map
-   {:closed true}
+  [:map {:closed true}
    [:title [:string {:min 1 :max 32}]]
    [:description [:string {:min  1 :max 255}]]
-   [:payload [:string {:min 1 :max 128}]]
-   [:provider_token :string]
+   [:start_parameter {:optional true} :string]
+   [:payload {:optional true} [:string {:min 1 :max 128}]]
+   [:provider_token {:optional true} :string]
    [:currency [:string {:min 3 :max 3}]]
-   [:prices [:vector [:map {:closed true}
-                      [:label :string]
-                      [:amount :int]]]]])
+   [:total_amount {:optional true} :int]  ; TODO: Something wierd with Invoice spec and workflow
+   [:prices {:optional true} [:vector [:map {:closed true}
+                                       [:label :string]
+                                       [:amount :int]]]]])
 
 
 (def InvoiceMessage

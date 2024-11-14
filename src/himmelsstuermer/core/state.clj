@@ -21,15 +21,14 @@
   [profile & args]
   (let [data (apply merge args)]
     {:profile profile
-     :storage (:db/storage data)
-     :schema (:db/schema data)
+     :connection (:db/conn data)
+     :database (:db/db data)
      :bot {:token (:bot/token data)
            :roles (:bot/roles data)
            :default-language-code (:bot/default-language-code data)}
      :project (assoc (misc/project-info)
                      :config
                      (:project/config data))
-     :database nil
      :transaction #{}
      :action nil
      :update nil
@@ -83,8 +82,7 @@
                               (throw (tt/error! {:id type
                                                  :data data'} exception))))}))
           (let [state (m/? (m/join (partial create-state profile)
-                                   init/db-schema
-                                   init/db-storage
+                                   init/db-conn
                                    init/bot-token
                                    init/bot-default-language-code
                                    init/bot-roles

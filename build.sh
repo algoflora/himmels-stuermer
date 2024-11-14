@@ -5,6 +5,7 @@ printf "\n\nBuild start...\n\n" &&
     java -jar ./test/resources/dynamodb/DynamoDBLocal.jar -inMemory &
 
     export HIMMELSSTUERMER_PROFILE=test &&
+    # export HIMMELSSTUERMER_USE_LOCAL_DYNAMODB=true &&
     lein test &&
 
     # printf "\n\nBuilding and analyzing test uberjar...\n\n" &&

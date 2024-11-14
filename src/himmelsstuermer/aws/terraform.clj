@@ -1,7 +1,6 @@
 (ns himmelsstuermer.aws.terraform
   (:require
     [clojure.java.io :as io]
-    [clojure.java.shell :refer [sh]]
     [clojure.string :as str]
     [himmelsstuermer.aws.common :refer [stream-to-out]]
     [himmelsstuermer.core.init :refer [bot-token]]
@@ -14,7 +13,7 @@
 
 
 (defn tf-config-path
-  [{:keys [target-dir tf-config-dir]} filename]
+  [{:keys [target-dir tf-config-dir] :as opts} filename]
   (let [tf-dir (-> (fs/file target-dir tf-config-dir) .getCanonicalPath)]
     (fs/file tf-dir filename)))
 

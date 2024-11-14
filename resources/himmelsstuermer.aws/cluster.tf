@@ -22,8 +22,10 @@ variable "lambda_memory_size" {}
 variable "lambda_architectures" {}
 variable "lambda_timeout" {}
 
-variable "image_name" {}
-variable "image_tag" {}
+variable "lambda_jar_file" {}
+
+# variable "image_name" {}
+# variable "image_tag" {}
 
 variable "bot_token" {}
 variable "cluster_workspace" {
@@ -504,6 +506,7 @@ resource "aws_iam_user_policy" "dynamodb_user_policy" {
       {
         Effect = "Allow"
         Action = [
+          "dynamodb:CreateTable",
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:Query",
@@ -550,7 +553,7 @@ resource "aws_iam_user_policy" "api_deployer" {
         ]
         Effect   = "Allow"
         Resource = "arn:aws:apigateway:${var.region}::/restapis/${aws_api_gateway_rest_api.cluster[0].id}/deployments"
-      },
+      }
     ]
   })
 }

@@ -1,8 +1,6 @@
 (ns himmelsstuermer.e2e-test
   (:gen-class)
   (:require
-    [clojure.test :refer [use-fixtures]]
-    [himmelsstuermer.core.storage :refer [test-storage-fixture]]
     [himmelsstuermer.e2e.scenes :refer [situation-run defscene]]))
 
 

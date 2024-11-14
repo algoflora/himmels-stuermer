@@ -4,7 +4,8 @@
     [cheshire.core :as json]
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
-    [datascript.core :as d]
+    ;; [datahike.spec :refer [SDB]]
+    [datahike.datom :refer [IDatom]]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
@@ -69,11 +70,12 @@
 (defn- walk
   [obj]
   (cond-> obj
-    (instance? Throwable obj) throwable->map
+    ;; (instance? Throwable obj) throwable->map
 
-    (d/db? obj) ((constantly "<DATASCRIPT DB>"))
+    ;; (SDB obj) ((constantly "<DATAHIKE DB>"))
 
-    (or (instance? clojure.lang.Var obj)
+    (or (satisfies? IDatom obj)
+        (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str
 
     (malli/schema? obj) transform-malli-scheme))
@@ -115,3 +117,6 @@
       (reset! initialized? true)
       (let [handlers (tt/get-handlers)]
         (tt/event! ::logging-initialized {:data {:handlers handlers}})))))
+
+
+(init-logging!)

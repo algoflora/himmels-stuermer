@@ -1,7 +1,7 @@
 (ns himmelsstuermer.impl.callbacks
   (:gen-class)
   (:require
-    [datascript.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.impl.transactor :refer [transact!]]
     [himmelsstuermer.spec.core :as spec]
     [malli.core :as malli]
@@ -29,7 +29,7 @@
   ([state user f args is-service]
    (set-callback state user f args is-service (java.util.UUID/randomUUID)))
   ([{:keys [txs]} user f args is-service uuid]
-   (let [args (or args {})
+   (let [args (pr-str (or args {}))
          tx-data [{:callback/uuid uuid
                    :callback/function f
                    :callback/arguments args

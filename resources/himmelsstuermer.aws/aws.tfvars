@@ -5,7 +5,9 @@ lambda_timeout = {{lambda-timeout}}
 {% endif %}
 lambda_architectures = ["{{lambda-architecture}}"]
 
-image_name = "{{image-name}}"
-image_tag = "{{image-tag}}"
+lambda_jar_file = "{{lambda-jar-file}}"
+
+# image_name = "{{image-name}}"
+# image_tag = "{{image-tag}}"
 
 bot_token = "{{bot-token}}"

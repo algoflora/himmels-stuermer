@@ -3,23 +3,25 @@
   (:require
     [cheshire.core :as json]
     [clojure.string :as str]
-    [clojure.walk :refer [postwalk]]
-    [datascript.core :as d]
-    [himmelsstuermer.core.config :as conf]
+    [clojure.walk :refer [postwalk keywordize-keys]]
+    [datahike.api :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.init]
-    [himmelsstuermer.core.logging :refer [init-logging! reset-nano-timer! throwable->map]]
+    [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.core.user :as u]
     [himmelsstuermer.impl.api :as api]
     [himmelsstuermer.impl.error :as err]
     [himmelsstuermer.impl.transactor :refer [get-txs]]
+    [himmelsstuermer.misc :refer [do-nanos*]]
     [himmelsstuermer.spec.core :as spec]
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [missionary.core :as m]
-    [org.httpkit.client :as http]
-    [taoensso.telemere :as tt]))
+    [taoensso.telemere :as tt])
+  (:import
+    (com.amazonaws.services.lambda.runtime
+      Context)))
 
 
 (defn- json-decode
@@ -98,28 +100,13 @@
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
-(malli/=> load-database [:-> spec/State spec/MissionaryTask])
-
-
-(defn load-database
-  [{:keys [storage schema] :as s}]
-  (m/via m/blk (let [db (or (d/restore storage) (-> schema d/create-conn deref))
-                     _ (tt/event! ::restored-db {:data {:db db}})
-                     state (s/modify-state s #(assoc % :database
-                                                     (d/with-schema db schema)))
-                     db    (:database state)]
-                 (tt/event! ::loaded-database {:data {:database db}})
-                 state)))
-
-
 (malli/=> handle-record [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
 (defn- handle-record
-  [s record]
-  (m/sp (let [[body state] (m/? (m/join vector
-                                        (m/sp (-> record :body json-decode))
-                                        (load-database s)))]
+  [state record]
+  (m/sp (let [body (-> record :body json-decode)]
+          (tt/event! ::handle-record {:data {:body body}})
           (cond
             (malli/validate spec.tg/Update body)
             (m/? (handle-update (s/modify-state state #(assoc % :update body))))
@@ -145,7 +132,7 @@
 (defn- perform-tasks
   [state tasks]
   (m/sp (tt/event! ::performing-tasks {:data {:tasks tasks
-                                              :state state}})
+                                              #_#_:state state}})
         (m/? (apply m/join
                     (fn [& args]
                       (into (:transaction state)
@@ -158,7 +145,7 @@
   (if (< 1 (count (filter #(= (:user/uuid user) (:callback/uuid %)) tx-set)))
     (into #{} (filter #(not (and (= (:user/uuid user) (:callback/uuid %))
                                  (= (symbol disp/main-handler) (:callback/function %))
-                                 (= {} (:callback/arguments %))))) tx-set)
+                                 (= {} (read-string (:callback/arguments %)))))) tx-set)
     tx-set))
 
 
@@ -166,13 +153,12 @@
 
 
 (defn- persist-data
-  [{:keys [database storage] :as state} tx-set]
-  (let [filtered-tx-set (filter-tx-set state tx-set)]
-    (m/via m/blk
-           (tt/event! ::persisting-data {:data {:tx-set filtered-tx-set}})
-           (-> database
-               (d/db-with (seq filtered-tx-set))
-               (d/store storage)))))
+  [{:keys [connection] :as state} tx-set]
+  (let [filtered-tx-set (filter-tx-set state tx-set)
+        tx-seq          (seq filtered-tx-set)]
+    (tt/event! ::persisting-data {:data {:tx-seq tx-seq}})
+    (m/via m/blk (do-nanos* (when tx-seq
+                              (d/transact connection tx-seq))))))
 
 
 (defn- execute-business-logic
@@ -181,10 +167,12 @@
    (m/sp (if fallback?
            (tt/event! ::executing-fallback {:data {:tasks tasks}})
            (tt/event! ::executing-business-logic {:data {:tasks tasks}}))
-         (try (let [tx-set    (m/? (perform-tasks state tasks))
-                    tx-report (sort (map str (:tx-data (m/? (persist-data state tx-set)))))]
+         (try (let [tx-set                 (m/? (perform-tasks state tasks))
+                    {:keys [result nanos]} (m/? (persist-data state tx-set))
+                    tx-report              (sort-by #(nth % 0) (:tx-data result))]
                 (tt/event! ::execute-finished {:data {:tx-set tx-set
-                                                      :tx-report tx-report}}))
+                                                      :tx-report tx-report
+                                                      :persisted-millis (* 0.000001 nanos)}}))
               (catch Exception exc
                 (let [exc-map (throwable->map exc)]
                   (if fallback?
@@ -202,7 +190,7 @@
 
 (defn handle-core
   [state record]
-  (m/sp (tt/event! ::handle-core {:data {:record record}}) ; TODO: check "private" chats, "/start" command, etc...
+  (m/sp (tt/event! ::handle-core {:data {:record record}})
         (let [state (m/? (handle-record state record))
               tasks (combine-tasks state)]
           (m/? (execute-business-logic state tasks)))))
@@ -224,27 +212,28 @@
    :stackTrace   (mapv str (.getStackTrace t))})
 
 
-(def invocations
-  (m/seed (repeatedly
-            (fn []
-              (m/via m/blk (let [url (runtime-api-url "invocation/next")]
-                             (tt/event! ::invocation-next-request {:data {:url url
-                                                                          :timeout timeout-ms}})
-                             @(http/get url {:timeout timeout-ms})))))))
+;; (def invocations
+;;   (m/seed (repeatedly
+;;             (fn []
+;;               (m/via m/blk (let [url (runtime-api-url "invocation/next")]
+;;                              (tt/event! ::invocation-next-request {:data {:url url
+;;                                                                           :timeout timeout-ms}})
+;;                              @(http/get url {:timeout timeout-ms})))))))
 
 
-(def events
-  (m/ap (let [initial-state (m/? s/state)
-              invoation-task (m/?> invocations)
-              {:keys [body headers]} (m/? invoation-task)]
-          (tt/set-ctx! (assoc tt/*ctx* :aws-context headers))
+(defn events
+  [records ^Context context]
+  (m/sp (let [initial-state (m/? s/state)
+              aws-request-id (.getAwsRequestId context)]
+          (tt/set-ctx! (assoc tt/*ctx* :aws-context {:aws-request-id aws-request-id}))
           {:state   (s/modify-state initial-state
-                                    #(assoc % :aws-context headers))
-           :records (:Records (json-decode body))})))
+                                    #(assoc % :aws-context {:aws-request-id aws-request-id}))
+           :records (mapv (fn [^java.util.Map jm] (keywordize-keys (into {} jm))) records)})))
 
 
-(def app
-  (m/ap (let [{:keys [state records]} (m/?> events)
+(defn app
+  [records context]
+  (m/ap (let [{:keys [state records]} (m/? (events records context))
               id (-> state :aws-context :lambda-runtime-aws-request-id)]
           (try (m/? (m/reduce (constantly :processed)
                               (m/ap (let [record (m/?> (m/seed records))]
@@ -253,42 +242,26 @@
                                       (tt/event! ::record-processed)
                                       #_(tt/set-ctx! (assoc tt/*ctx* :state state))))))
 
-               (let [aws-response (case @conf/profile
-                                    :test
-                                    "TEST RESPONSE" ; TODO: Create HTTP-mock fixture!
-                                    :aws
-                                    (m/? (m/via m/blk
-                                                @(http/post (runtime-api-url (format "invocation/%s/response" id))
-                                                            {:body "OK"}))))]
-                 (tt/event! ::invocation-response-ok {:data {:invocation-id id
-                                                             :aws-response  aws-response}}))
-
+               (tt/event! ::invocation-ok {:data {:invocation-id id}})
 
                (catch Exception exc
-                 (let [exc-map (throwable->map exc)
-                       aws-response (case @conf/profile
-                                      :test
-                                      "TEST RESPONSE"
-                                      :aws
-                                      (m/? (m/via m/blk
-                                                  @(http/post (runtime-api-url (format "invocation/%s/error" id))
-                                                              {:body
-                                                               (json/encode (throwable->error-body exc))}))))]
-                   (tt/error! {:id   ::unhandled-exception
-                               :data {:invocation-id id
-                                      :error         exc-map
-                                      :aws-response  aws-response}}
-                              exc)))
+                 (let [exc-map (throwable->map exc)]
+                   (throw (tt/error! {:id   ::unhandled-exception
+                                      :data {:invocation-id id
+                                             :error         exc-map}}
+                                     exc))))
                (finally (tt/set-ctx! (dissoc tt/*ctx* :aws-context)))))))
 
 
 (defn run
-  [& _]
-  (init-logging!)
+  [& args]
+  (reset-nano-timer!)
+  ;; (init-logging!)
   (tt/event! ::start-main {:let [env (System/getenv)]
                            :data {:main "-main"
+                                  :args args
                                   :environment env}})
-  (m/? (m/reduce conj app)))
+  (m/? (m/reduce conj (apply app args))))
 
 
 (defn -main
@@ -298,16 +271,11 @@
 
 (comment
 
-  (def t (m/via m/blk (+ 1 2 3)))
+  (require '[missionary.core :as m])
 
-  (m/? t)
+  (def b (m/via m/blk (/ 1 0) (m/? (m/sleep 500 :yo))))
+
   
-  (def fl (m/seed (repeatedly 3 (fn [] (m/via m/blk
-                                         (println "REQUEST")
-                                         @(http/get "http://ifconfig.me"))))))
-
-  (println "--------")
-  (m/? (m/reduce conj (m/ap (let [resp (m/?> fl)]
-                              (m/? (m/sleep 1000))
-                              (println "RESPONSE" (subs (:body (m/? resp)) 0 10))))))
+  (m/? (m/join vector (m/sp :a) b))
+  
   )

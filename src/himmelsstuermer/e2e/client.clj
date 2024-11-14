@@ -7,25 +7,45 @@
     [himmelsstuermer.spec.telegram :as spec.tg]
     [malli.core :as malli]
     [malli.generator :refer [generate]]
-    [missionary.core :as m]
     [taoensso.telemere :as tt]
-    [tick.core :as t]))
+    [tick.core :as t])
+  (:import
+    (com.amazonaws.services.lambda.runtime
+      Context)))
 
 
 (defonce ^:private update-id (atom 0))
+
+
+(def mock-lambda-context
+  (reify Context
+    (getAwsRequestId [_] "mock-request-id")))
+
+
+(defn mock-record
+  []
+  (let [java-map (java.util.HashMap.)]
+    (doseq [[k v] (generate spec/Record)]
+      (.put java-map
+            (if (keyword? k) (name k) (str k))
+            v))
+    java-map))
+
 
 (malli/=> send-update [:-> spec.tg/Update :any])
 
 
 (defn send-update
   [data]
-  (let [update      (assoc data :update_id (swap! update-id inc))
-        mock-record (generate spec/Record)
-        mock-data   {:body (json/encode {:Records [(assoc mock-record :body (json/encode update))]})
-                     :headers {:lambda-runtime-aws-request-id (str (random-uuid))}}]
-    (tt/event! ::send-update {:data {:update update :mock-data mock-data}})
-    (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [(m/sp mock-data)])))
-    (himmelsstuermer.core/run)))
+  (let [update       (assoc data :update_id (swap! update-id inc))
+        mock-record  (mock-record)
+        _ (.put mock-record "body" (json/encode update))
+        mock-records (java.util.Collections/singletonList mock-record)]
+    (tt/event! ::send-update {:data {:update update
+                                     :mock-records mock-records
+                                     :mock-context mock-lambda-context}})
+    ;; (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [(m/sp mock-data)])))
+    (himmelsstuermer.core/run mock-records mock-lambda-context)))
 
 
 (malli/=> send-action-request [:-> spec/ActionRequest :any])
@@ -33,12 +53,14 @@
 
 (defn send-action-request
   [action-request]
-  (let [mock-record (generate spec/Record)
-        mock-data   {:body (json/encode {:Records [(assoc mock-record :body (json/encode action-request))]})
-                     :headers {"lambda-runtime-aws-request-id" (str (random-uuid))}}]
-    (tt/event! ::send-action-request {:data {:update update :mock-data mock-data}})
-    (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [(m/sp mock-data)])))
-    (himmelsstuermer.core/run)))
+  (let [mock-record  (mock-record)
+        _ (.put mock-record "body" (json/encode action-request))
+        mock-records (java.util.Collections/singletonList mock-record)]
+    (tt/event! ::send-action-request {:data {:update update
+                                             :mock-records mock-records
+                                             :mock-context mock-lambda-context}})
+    ;; (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [(m/sp mock-data)])))
+    (himmelsstuermer.core/run mock-records mock-lambda-context)))
 
 
 (malli/=> dummy-kw?->dummy [:-> [:or spec.tg/User :keyword] spec.tg/User])

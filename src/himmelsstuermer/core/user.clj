@@ -1,6 +1,6 @@
 (ns himmelsstuermer.core.user
   (:require
-    [datascript.core :as d]
+    [datahike.api :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
@@ -30,7 +30,7 @@
                      :user/language-code (:language_code udata))]
     (tt/event! ::user-renew {:data {:old-user user
                                     :new-user user'}})
-    [user' (into {} (filter #(-> % second some?)) user')]))
+    [user' [(into {} (filter #(-> % second some?)) user')]]))
 
 
 (malli/=> create [:=> [:cat :symbol spec.tg/User] [:cat spec/User [:vector [:or [:vector :any] :map]]]])
@@ -52,7 +52,7 @@
     [user [user
            {:callback/uuid uuid
             :callback/function handler-main
-            :callback/arguments {}
+            :callback/arguments (pr-str {})
             :callback/user -1
             :callback/service? false}]]))
 
@@ -114,16 +114,20 @@
                function        @(if is-payment? disp/payment-handler
                                     (or (disp/resolve-symbol! (:callback/function callback?))
                                         disp/main-handler))
-               arguments       (or (:callback/arguments callback?) {})]
+               arguments       (or (some-> callback?
+                                           :callback/arguments
+                                           read-string) {})]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
                                     (and (or (not=   (symbol disp/main-handler)
                                                      (:callback/function user-callback?))
-                                             (seq (:callback/arguments user-callback?)))
+                                             (seq (some-> user-callback?
+                                                          :callback/arguments
+                                                          read-string)))
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
                                                                :callback/function (symbol disp/main-handler)
-                                                               :callback/arguments {}})
+                                                               :callback/arguments (pr-str {})})
 
                                     :always (->
                                               (assoc :user user)

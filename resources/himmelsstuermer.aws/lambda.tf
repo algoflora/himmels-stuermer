@@ -26,43 +26,43 @@ data "terraform_remote_state" "cluster" {
   }
 }
 
-# ECR Repository
-resource "aws_ecr_repository" "ecr-repo-{{lambda-name}}" {
-  count = terraform.workspace == var.lambda_workspace ? 1 : 0
+# # ECR Repository
+# resource "aws_ecr_repository" "ecr-repo-{{lambda-name}}" {
+#   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
-  name = "himmelsstuermer-${local.lambda_tags.cluster}-ecr-repo-${var.lambda_name}"
+#   name = "himmelsstuermer-${local.lambda_tags.cluster}-ecr-repo-${var.lambda_name}"
 
-  tags = merge(local.lambda_tags, {
-    Name = "himmelsstuermer.${local.lambda_tags.cluster}.ecr-repo.${var.lambda_name}"
-  })
-}
+#   tags = merge(local.lambda_tags, {
+#     Name = "himmelsstuermer.${local.lambda_tags.cluster}.ecr-repo.${var.lambda_name}"
+#   })
+# }
 
-# Get the login command to authenticate Docker to ECR
-data "aws_ecr_authorization_token" "auth" {}
+# # Get the login command to authenticate Docker to ECR
+# data "aws_ecr_authorization_token" "auth" {}
 
-# Execute Docker push command
-resource "null_resource" "push_image-{{lambda-name}}" {
-  count = terraform.workspace == var.lambda_workspace ? 1 : 0
+# # Execute Docker push command
+# resource "null_resource" "push_image-{{lambda-name}}" {
+#   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
-  triggers = {
-    image = "${var.image_name}:${var.image_tag}"
-  }
+#   triggers = {
+#     image = "${var.image_name}:${var.image_tag}"
+#   }
 
-  provisioner "local-exec" {
-    command = <<EOT
-      # Authenticate Docker to ECR
-      aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${data.aws_ecr_authorization_token.auth.proxy_endpoint}
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       # Authenticate Docker to ECR
+#       aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${data.aws_ecr_authorization_token.auth.proxy_endpoint}
 
-      # Tag the local Docker image with the ECR repository URI
-      docker tag ${var.image_name}:${var.image_tag} ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}
+#       # Tag the local Docker image with the ECR repository URI
+#       docker tag ${var.image_name}:${var.image_tag} ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}
 
-      # Push the tagged Docker image to ECR
-      docker push ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}
-    EOT
-  }
+#       # Push the tagged Docker image to ECR
+#       docker push ${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}
+#     EOT
+#   }
 
-  depends_on = [aws_ecr_repository.ecr-repo-{{lambda-name}}]
-}
+#   depends_on = [aws_ecr_repository.ecr-repo-{{lambda-name}}]
+# }
 
 # Lambda Function
 resource "aws_lambda_function" "lambda-{{lambda-name}}" {
@@ -71,13 +71,25 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
   function_name = "himmelsstuermer-${local.lambda_tags.cluster}-${var.lambda_name}"
   role          = "${aws_iam_role.lambda-{{lambda-name}}[0].arn}"
 
-  package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}"
+  # package_type  = "Image"
+  # image_uri     = "${aws_ecr_repository.ecr-repo-{{lambda-name}}[0].repository_url}:${var.image_tag}"
+
+  handler       = "himmelsstuermer.java.ClojureLambdaHandler::handleRequest"
+  runtime       = "java21"  # Set to Java 21 runtime
+  publish       = true
   
   memory_size   = var.lambda_memory_size
   architectures = var.lambda_architectures
   timeout       = var.lambda_timeout
 
+  filename = var.lambda_jar_file
+  source_code_hash = filebase64sha256(var.lambda_jar_file)
+
+  # Enable SnapStart for published versions
+  snap_start {
+    apply_on = "PublishedVersions"  # Applies to published versions only
+  }
+  
   vpc_config {
     subnet_ids         = data.terraform_remote_state.cluster[0].outputs.aws_subnet_private[*].id
     security_group_ids = [data.terraform_remote_state.cluster[0].outputs.aws_security_group_lambda_shared.id]
@@ -85,17 +97,20 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
 
   environment {
     variables = {
+      HIMMELSSTUERMER_PROFILE = "aws"
+      
       DYNAMODB_PUBLIC_KEY = data.terraform_remote_state.cluster[0].outputs.dynamodb_user_access_key
       DYNAMODB_SECRET_KEY = data.terraform_remote_state.cluster[0].outputs.dynamodb_user_secret_key
-      DYNAMODB_ENDPOINT   = "https://${data.aws_caller_identity.current.account_id}.ddb.${var.region}.amazonaws.com"
       DYNAMODB_TABLE_NAME = aws_dynamodb_table.dynamodb_table-{{lambda-name}}[0].name
+
+      JAVA_TOOL_OPTIONS = "-XX:+UseContainerSupport"
   {% for i in lambda-env-vars %}
       {{i.key}} = "{{i.val}}"
   {% endfor %}
     }
   }
 
-  depends_on=[null_resource.push_image-{{lambda-name}}]
+  # depends_on=[null_resource.push_image-{{lambda-name}}]
 
   tags = merge(local.lambda_tags, {
     Name = "himmelsstuermer.${local.lambda_tags.cluster}.lambda.${var.lambda_name}"
@@ -107,18 +122,17 @@ resource "aws_dynamodb_table" "dynamodb_table-{{lambda-name}}" {
 
   name           = "${local.lambda_tags.cluster}-${var.lambda_name}"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "addr"
+  hash_key       = "Key"
 
   attribute {
-    name = "addr"
-    type = "N"
+    name = "Key"
+    type = "S"
   }
 
   tags = merge(local.lambda_tags, {
     Name = "himmelsstuermer.${local.lambda_tags.cluster}.dynamodb_table.${var.lambda_name}"
   })
 }
-
 
 # SQS Queue for the Lambda function
 resource "aws_sqs_queue" "lambda_queue-{{lambda-name}}" {
@@ -332,7 +346,7 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger-{{lambda-name}}" {
   count = terraform.workspace == var.lambda_workspace ? 1 : 0
 
   event_source_arn = aws_sqs_queue.lambda_queue-{{lambda-name}}[0].arn
-  function_name    = aws_lambda_function.lambda-{{lambda-name}}[0].arn
+  function_name    = "${aws_lambda_function.lambda-{{lambda-name}}[0].function_name}:${aws_lambda_function.lambda-{{lambda-name}}[0].version}"
   
   batch_size       = 10
   maximum_batching_window_in_seconds = 0
@@ -478,7 +492,7 @@ resource "null_resource" "deploy_api-{{lambda-name}}" {
         --stage-name ${var.cluster_tags.cluster} \
         --description "Deployment triggered by Terraform"
 
-      curl -X POST https://api.telegram.org/bot${var.bot_token}/setWebhook \
+     curl -X POST https://api.telegram.org/bot${var.bot_token}/setWebhook \
         -H "Content-Type: application/json" \
         -d '{
           "url": "${local.webhook_url}",

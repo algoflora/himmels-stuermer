@@ -1,7 +1,6 @@
 (ns himmelsstuermer.spec.core
   (:require
-    [datascript.core :as d]
-    [datascript.storage :refer [IStorage]]
+    [datahike.spec :refer [SConnection SDB]]
     [himmelsstuermer.api.buttons :as b]
     [himmelsstuermer.impl.transactor]
     [himmelsstuermer.spec.telegram :as spec.tg]))
@@ -74,8 +73,8 @@
 (def State
   [:map {:closed true}
    [:profile :keyword]
-   [:storage [:fn #(satisfies? IStorage %)]]
-   [:schema [:map-of :keyword [:map-of :keyword [:or :keyword :string :boolean]]]]
+   [:connection [:fn SConnection]]
+   [:database [:fn SDB]]
    [:bot [:map {:closed true}
           [:token [:re #"^\d{10}:[a-zA-Z0-9_-]{35}$"]]
           [:roles [:map-of :keyword [:set [:or :int :string]]]]
@@ -83,7 +82,6 @@
    [:project [:map {:closed true}
               [:name :string]
               [:config :map]]]
-   [:database [:maybe [:fn d/db?]]]
    [:action [:maybe Action]]
    [:update [:maybe spec.tg/Update]]
    [:message [:maybe spec.tg/Message]]
@@ -94,7 +92,8 @@
    [:arguments :map]
    [:transaction [:set [:or :map [:vector :any]]]] ; TODO: Transaction vector spec?
    [:tasks [:set MissionaryTask]]
-   [:aws-context [:maybe [:map-of :keyword :string]]]])
+   [:aws-context [:maybe [:map
+                          [:aws-request-id :string]]]]])
 
 
 (def UserState
@@ -105,7 +104,7 @@
           [:default-language-code :keyword]]]
    [:prf :keyword]
    [:cfg :map]
-   [:idb [:fn d/db?]]
+   [:idb [:fn SDB]]
    [:txs [:fn #(satisfies? himmelsstuermer.impl.transactor/TransactionsAccumulator %)]]
    [:msg [:maybe spec.tg/Message]]
    [:cbq [:maybe spec.tg/CallbackQuery]]

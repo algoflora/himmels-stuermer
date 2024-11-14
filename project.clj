@@ -6,15 +6,32 @@
   :dependencies [[aero/aero "1.1.6"]
                  [cheshire "5.13.0"]
                  [com.taoensso/telemere "1.0.0-RC1"]
+                 [com.taoensso/slf4j-telemere "1.0.0-beta21"]
+                 [org.slf4j/slf4j-api "2.0.16"]
                  [http-kit/http-kit "2.8.0"]
-                 [me.raynes/fs "1.4.6"]
+                 [me.raynes/fs "1.4.6"
+                  :exclusions [org.tukaani/xz]]
                  [metosin/malli "0.16.4"]
                  [missionary "b.40"]
                  [org.clojure/clojure "1.12.0"]
                  [selmer "1.12.61"]
                  [tick/tick "1.0"]
-                 [datascript "1.7.3"]
-                 [com.github.igrishaev/dynamodb "0.1.4"]]
+                 [io.replikativ/datahike "0.6.1593"]
+                 [io.replikativ/datahike-dynamodb "0.1.5"]
+                 [software.amazon.awssdk/aws-core "2.29.3"]
+                 [com.amazonaws/aws-lambda-java-core "1.2.3"]
+                 [com.amazonaws/aws-lambda-java-runtime-interface-client "2.6.0"]
+
+                 ;; [org.clojure/core.async "1.6.681"
+                 ;;  :exclusions [org.clojure/core.memoize]]
+                 ;; [io.replikativ/datahike "0.6.1592"
+                 ;;  :exclusions [io.replikativ/superv.async
+                 ;;               io.replikativ/konserve
+                 ;;               org.clojure/core.async]]
+                 ;; [io.replikativ/datahike-dynamodb "0.1.4"
+                 ;;  :exclusions [commons-logging]]
+                 ;; [software.amazon.awssdk/aws-core "2.29.3"]
+                 ]
 
   :plugins [[jonase/eastwood "1.4.3"]
             [lein-ancient "1.0.0-RC3"]
@@ -23,9 +40,10 @@
   :native-image {:name "lambda"}
 
   :source-paths ["src"]
+  :java-source-paths ["src"]
   :resource-paths ["resources"]
   :main ^:skip-aot himmelsstuermer.core
-  ;; :aot [himmelsstuermer.core.db]
+  :aot :all
 
   :target-path "target/%s"
 
@@ -37,7 +55,7 @@
                                     "-Dhimmelsstuermer.profile=test"]}
 
              :uber      {:main himmelsstuermer.core
-                         :aot [himmelsstuermer.core]
+                         :aot :all #_[himmelsstuermer.core]
                          :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
                          :uberjar-name "himmelsstuermer.jar"}
 
