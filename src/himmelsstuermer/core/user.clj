@@ -1,6 +1,6 @@
 (ns himmelsstuermer.core.user
   (:require
-    [datahike.api :as d]
+    [datascript.core :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.state :as s]
     [himmelsstuermer.spec.core :as spec]
@@ -52,7 +52,7 @@
     [user [user
            {:callback/uuid uuid
             :callback/function handler-main
-            :callback/arguments (pr-str {})
+            :callback/arguments {}
             :callback/user -1
             :callback/service? false}]]))
 
@@ -114,20 +114,16 @@
                function        @(if is-payment? disp/payment-handler
                                     (or (disp/resolve-symbol! (:callback/function callback?))
                                         disp/main-handler))
-               arguments       (or (some-> callback?
-                                           :callback/arguments
-                                           read-string) {})]
+               arguments       (or (:callback/arguments callback?) {})]
            (tt/event! ::user-loaded {:data {:user user}})
            (s/modify-state state #(cond-> %
                                     (and (or (not=   (symbol disp/main-handler)
                                                      (:callback/function user-callback?))
-                                             (seq (some-> user-callback?
-                                                          :callback/arguments
-                                                          read-string)))
+                                             (seq (:callback/arguments user-callback?)))
                                          (false? (:calllback/service? callback?)))
                                     (update :transaction conj {:callback/uuid (:user/uuid user)
                                                                :callback/function (symbol disp/main-handler)
-                                                               :callback/arguments (pr-str {})})
+                                                               :callback/arguments {}})
 
                                     :always (->
                                               (assoc :user user)

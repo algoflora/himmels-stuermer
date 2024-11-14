@@ -16,22 +16,10 @@
                  [org.clojure/clojure "1.12.0"]
                  [selmer "1.12.61"]
                  [tick/tick "1.0"]
-                 [io.replikativ/datahike "0.6.1593"]
-                 [io.replikativ/datahike-dynamodb "0.1.5"]
-                 [software.amazon.awssdk/aws-core "2.29.3"]
-                 [com.amazonaws/aws-lambda-java-core "1.2.3"]
-                 [com.amazonaws/aws-lambda-java-runtime-interface-client "2.6.0"]
 
-                 ;; [org.clojure/core.async "1.6.681"
-                 ;;  :exclusions [org.clojure/core.memoize]]
-                 ;; [io.replikativ/datahike "0.6.1592"
-                 ;;  :exclusions [io.replikativ/superv.async
-                 ;;               io.replikativ/konserve
-                 ;;               org.clojure/core.async]]
-                 ;; [io.replikativ/datahike-dynamodb "0.1.4"
-                 ;;  :exclusions [commons-logging]]
-                 ;; [software.amazon.awssdk/aws-core "2.29.3"]
-                 ]
+                 [datascript "1.7.3"]
+                 [com.github.igrishaev/dynamodb "0.1.2"]
+                 [com.amazonaws/aws-lambda-java-runtime-interface-client "2.6.0"]]
 
   :plugins [[jonase/eastwood "1.4.3"]
             [lein-ancient "1.0.0-RC3"]

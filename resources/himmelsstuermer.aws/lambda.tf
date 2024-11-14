@@ -101,6 +101,7 @@ resource "aws_lambda_function" "lambda-{{lambda-name}}" {
       
       DYNAMODB_PUBLIC_KEY = data.terraform_remote_state.cluster[0].outputs.dynamodb_user_access_key
       DYNAMODB_SECRET_KEY = data.terraform_remote_state.cluster[0].outputs.dynamodb_user_secret_key
+      DYNAMODB_ENDPOINT   = "https://dynamodb.${var.region}.amazonaws.com"
       DYNAMODB_TABLE_NAME = aws_dynamodb_table.dynamodb_table-{{lambda-name}}[0].name
 
       JAVA_TOOL_OPTIONS = "-XX:+UseContainerSupport"
@@ -122,11 +123,11 @@ resource "aws_dynamodb_table" "dynamodb_table-{{lambda-name}}" {
 
   name           = "${local.lambda_tags.cluster}-${var.lambda_name}"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "Key"
+  hash_key       = "addr"
 
   attribute {
-    name = "Key"
-    type = "S"
+    name = "addr"
+    type = "N"
   }
 
   tags = merge(local.lambda_tags, {

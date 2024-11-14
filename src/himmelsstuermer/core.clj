@@ -4,7 +4,7 @@
     [cheshire.core :as json]
     [clojure.string :as str]
     [clojure.walk :refer [postwalk keywordize-keys]]
-    [datahike.api :as d]
+    [datascript.core :as d]
     [himmelsstuermer.core.dispatcher :as disp]
     [himmelsstuermer.core.init]
     [himmelsstuermer.core.logging :refer [reset-nano-timer! throwable->map]]
@@ -100,13 +100,28 @@
           (s/modify-state state #(assoc % :function function :arguments arguments)))))
 
 
+(malli/=> load-database [:-> spec/State spec/MissionaryTask])
+
+
+(defn load-database
+  [{:keys [storage schema] :as s}]
+  (m/via m/blk (let [db (or (d/restore storage) (-> schema d/create-conn deref))
+                     _ (tt/event! ::restored-db {:data {:db db}})
+                     state (s/modify-state s #(assoc % :database
+                                                     (d/with-schema db schema)))
+                     db    (:database state)]
+                 (tt/event! ::loaded-database {:data {:database db}})
+                 state)))
+
+
 (malli/=> handle-record [:=> [:cat spec/State spec/Record] spec/MissionaryTask])
 
 
 (defn- handle-record
-  [state record]
-  (m/sp (let [body (-> record :body json-decode)]
-          (tt/event! ::handle-record {:data {:body body}})
+  [s record]
+  (m/sp (let [[body state] (m/? (m/join vector
+                                        (m/sp (-> record :body json-decode))
+                                        (load-database s)))]
           (cond
             (malli/validate spec.tg/Update body)
             (m/? (handle-update (s/modify-state state #(assoc % :update body))))
@@ -145,7 +160,7 @@
   (if (< 1 (count (filter #(= (:user/uuid user) (:callback/uuid %)) tx-set)))
     (into #{} (filter #(not (and (= (:user/uuid user) (:callback/uuid %))
                                  (= (symbol disp/main-handler) (:callback/function %))
-                                 (= {} (read-string (:callback/arguments %)))))) tx-set)
+                                 (= {} (:callback/arguments %))))) tx-set)
     tx-set))
 
 
@@ -153,12 +168,13 @@
 
 
 (defn- persist-data
-  [{:keys [connection] :as state} tx-set]
-  (let [filtered-tx-set (filter-tx-set state tx-set)
-        tx-seq          (seq filtered-tx-set)]
-    (tt/event! ::persisting-data {:data {:tx-seq tx-seq}})
-    (m/via m/blk (do-nanos* (when tx-seq
-                              (d/transact connection tx-seq))))))
+  [{:keys [database storage] :as state} tx-set]
+  (let [filtered-tx-set (filter-tx-set state tx-set)]
+    (m/via m/blk
+           (tt/event! ::persisting-data {:data {:tx-set filtered-tx-set}})
+           (-> database
+               (d/db-with (seq filtered-tx-set))
+               (d/store storage)))))
 
 
 (defn- execute-business-logic

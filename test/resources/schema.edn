@@ -1,8 +1,5 @@
-[{:db/ident :test-entity/user
-  :db/valueType :db.type/ref
-  :db/cardinality :db.cardinality/one
-  :db/unique :db.unique/identity}
+{:test-entity/user {:db/valueType :db.type/ref
+                    :db/cardinality :db.cardinality/one
+                    :db/unique :db.unique/identity}
 
- {:db/ident :test-entity/data
-  :db/valueType :db.type/string
-  :db/cardinality :db.cardinality/one}]
+ :test-entity/data {:db/cardinality :db.cardinality/one}}

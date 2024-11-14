@@ -4,8 +4,7 @@
     [cheshire.core :as json]
     [cheshire.generate :as gen]
     [clojure.walk :refer [prewalk]]
-    ;; [datahike.spec :refer [SDB]]
-    [datahike.datom :refer [IDatom]]
+    [datascript.core :as d]
     [himmelsstuermer.core.config :as conf]
     [himmelsstuermer.misc :as misc]
     [malli.core :as malli]
@@ -70,12 +69,11 @@
 (defn- walk
   [obj]
   (cond-> obj
-    ;; (instance? Throwable obj) throwable->map
+    (instance? Throwable obj) throwable->map
 
-    ;; (SDB obj) ((constantly "<DATAHIKE DB>"))
+    (d/db? obj) ((constantly "<DATASCRIPT DB>"))
 
-    (or (satisfies? IDatom obj)
-        (instance? clojure.lang.Var obj)
+    (or (instance? clojure.lang.Var obj)
         (instance? java.util.regex.Pattern obj)) str
 
     (malli/schema? obj) transform-malli-scheme))
