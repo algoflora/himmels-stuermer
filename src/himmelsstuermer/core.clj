@@ -230,7 +230,7 @@
 (defn events
   [records ^Context context]
   (m/sp (let [initial-state (m/? s/state)
-              aws-request-id (.getAwsRequestId context)]
+              aws-request-id (.getAwsRequestId ^Context context)]
           (tt/set-ctx! (assoc tt/*ctx* :aws-context {:aws-request-id aws-request-id}))
           {:state   (s/modify-state initial-state
                                     #(assoc % :aws-context {:aws-request-id aws-request-id}))

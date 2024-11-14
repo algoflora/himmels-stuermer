@@ -13,7 +13,7 @@
 
 
 (defn tf-config-path
-  [{:keys [target-dir tf-config-dir] :as opts} filename]
+  [{:keys [target-dir tf-config-dir]} filename]
   (let [tf-dir (-> (fs/file target-dir tf-config-dir) .getCanonicalPath)]
     (fs/file tf-dir filename)))
 
@@ -39,7 +39,7 @@
            {:type :aws/missing-file
             :filename (str config-file)})))
      (let [dir     (fs/parent config-file)
-           builder (ProcessBuilder. command)
+           builder (ProcessBuilder. ^java.util.List command)
            _ (.directory builder dir)
            process (.start builder)
            _ (stream-to-out (.getInputStream process))

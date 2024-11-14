@@ -23,6 +23,7 @@
 
 
 (defn mock-record
+  ^java.util.HashMap
   []
   (let [java-map (java.util.HashMap.)]
     (doseq [[k v] (generate spec/Record)]
@@ -44,7 +45,6 @@
     (tt/event! ::send-update {:data {:update update
                                      :mock-records mock-records
                                      :mock-context mock-lambda-context}})
-    ;; (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [(m/sp mock-data)])))
     (himmelsstuermer.core/run mock-records mock-lambda-context)))
 
 
@@ -59,7 +59,6 @@
     (tt/event! ::send-action-request {:data {:update update
                                              :mock-records mock-records
                                              :mock-context mock-lambda-context}})
-    ;; (alter-var-root #'himmelsstuermer.core/invocations (constantly (m/seed [(m/sp mock-data)])))
     (himmelsstuermer.core/run mock-records mock-lambda-context)))
 
 

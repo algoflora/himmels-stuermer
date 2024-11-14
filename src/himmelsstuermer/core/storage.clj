@@ -73,7 +73,7 @@
                                              :Key {:Addr {:N (str addr)}}
                                              :ProjectionExpression "Payload"}))
               {data :result deserialization-nanos :nanos}
-              (misc/do-nanos* (some-> result :Item :Payload :B .getBytes b64/decode nippy/thaw))]
+              (misc/do-nanos* (some-> result :Item :Payload :B str .getBytes b64/decode nippy/thaw))]
           (tt/event! ::storage-restore {:data {:Addr addr
                                                :response (update-in result [:Item :Payload :B] count)
                                                :deserialization-millis (* 0.000001 deserialization-nanos)
