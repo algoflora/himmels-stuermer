@@ -21,7 +21,10 @@
 
 (defn request
   [token method data]
-  (let [url  (format "https://api.telegram.org/bot%s/%s" token (name method))
+  (let [url  (format "https://%s/bot%s/%s"
+                     (System/getenv "TELEGRAM_API_HOST" "api.telegram.org")
+                     token
+                     (name method))
 
         {:keys [result nanos]}
         (misc/do-nanos* @(http/post url {:headers {"Content-Type" "application/json"}
@@ -51,16 +54,16 @@
 
 (defn api-task
   [state method data]
-  (m/sp (let [api-fn (case @conf/profile
-                       :test (resolve 'himmelsstuermer.e2e.serve/request)
-                       :aws  (resolve 'himmelsstuermer.impl.api/request))
-              token  (-> state :bot :token)]
-          (tt/event! ::calling-api-fn
-                     {:data {:function api-fn
-                             :profile @conf/profile
-                             :method method
-                             :data data}})
-          (api-fn token method data))))
+  (m/via m/blk (let [api-fn (case @conf/profile
+                              :test (resolve 'himmelsstuermer.e2e.serve/request)
+                              :aws  (resolve 'himmelsstuermer.impl.api/request))
+                     token  (-> state :bot :token)]
+                 (tt/event! ::calling-api-fn
+                            {:data {:function api-fn
+                                    :profile @conf/profile
+                                    :method method
+                                    :data data}})
+                 (api-fn token method data))))
 
 
 (malli/=> prepare-keyboard [:=>
@@ -204,7 +207,7 @@
 
 (defn- send-message-
   [state body]
-  (m/sp (m/? (api-task state :sendMessage body))))
+  (api-task state :sendMessage body))
 
 
 (malli/=> edit-message-text- [:=> [:cat spec/UserState :map] spec/MissionaryTask])
@@ -305,10 +308,10 @@
 
 (defn get-file
   [state file-id]
-  (m/via m/blk (let [file-path (m/? (api-task state :getFile file-id))]
-                 (if (fs/exists? file-path)
-                   (fs/file file-path)
-                   (download-file (-> state :bot :token) file-path)))))
+  (m/sp (let [file-path (m/? (api-task state :getFile file-id))]
+          (if (fs/exists? file-path)
+            (fs/file file-path)
+            (m/? (m/via m/blk (download-file (-> state :bot :token) file-path)))))))
 
 
 (defn delete-message

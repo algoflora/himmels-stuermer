@@ -14,10 +14,10 @@
     [taoensso.telemere :as tt]))
 
 
-(malli/=> create-state [:=> [:cat :keyword [:* :map]] spec/State])
+(malli/=> merge-state [:=> [:cat :keyword [:* :map]] spec/State])
 
 
-(defn- create-state
+(defn- merge-state
   [profile & args]
   (let [data (apply merge args)]
     {:profile profile
@@ -66,31 +66,40 @@
     (merge base-map (:arguments state))))
 
 
-(def state
-  (m/sp (let [profile @conf/profile]
-          (when (Boolean/parseBoolean (System/getProperty "himmelsstuermer.malli.instrument"))
-            (tt/event! ::malli-instrument-run)
-            (instrument! {:report
-                          (fn [type data]
-                            (let [[s v] (case type
-                                          :malli.core/invalid-input  [(:input data)  (:args data)]
-                                          :malli.core/invalid-output [(:output data) (:value data)]
-                                          nil)
-                                  explanation (when (malli/schema? s)
-                                                (malli/explain s v))
-                                  data'     (assoc data :explain explanation)
-                                  exception (malli/-exception type data')]
-                              (throw (tt/error! {:id type
-                                                 :data data'} exception))))}))
-          (let [state (m/? (m/join (partial create-state profile)
-                                   init/db-storage
-                                   init/db-schema
-                                   init/bot-token
-                                   init/bot-default-language-code
-                                   init/bot-roles
-                                   init/project-config))]
-            (tt/event! ::state-created {:data state})
-            state))))
+(defonce ^:private !initial-state (atom nil))
+
+
+(defn get-initial-state
+  []
+  @!initial-state)
+
+
+(defn- create-initial-state
+  []
+  (let [profile @conf/profile]
+    (when (Boolean/parseBoolean (System/getProperty "himmelsstuermer.malli.instrument"))
+      (tt/event! ::malli-instrument-run)
+      (instrument! {:report
+                    (fn [type data]
+                      (let [[s v] (case type
+                                    :malli.core/invalid-input  [(:input data)  (:args data)]
+                                    :malli.core/invalid-output [(:output data) (:value data)]
+                                    nil)
+                            explanation (when (malli/schema? s)
+                                          (malli/explain s v))
+                            data'     (assoc data :explain explanation)
+                            exception (malli/-exception type data')]
+                        (throw (tt/error! {:id type
+                                           :data data'} exception))))}))
+    (let [state (m/? (m/join (partial merge-state profile)
+                             init/db-storage
+                             init/db-schema
+                             init/bot-token
+                             init/bot-default-language-code
+                             init/bot-roles
+                             init/project-config))]
+      (tt/event! ::initial-state-created {:data state})
+      (reset! !initial-state state))))
 
 
 (malli/=> modify-state [:=> [:cat spec/State fn?] spec/State])

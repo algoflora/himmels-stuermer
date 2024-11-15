@@ -3,8 +3,7 @@
     [clojure.edn :as edn]
     [clojure.java.io :as io]
     [himmelsstuermer.core.config :as conf]
-    [himmelsstuermer.core.storage :refer [get-storage test-client-opts]]
-    [himmelsstuermer.misc :as misc]
+    [himmelsstuermer.core.storage :refer [get-storage]]
     [missionary.core :as m]
     [taoensso.telemere :as tt]))
 
@@ -26,23 +25,8 @@
 (def db-storage
   ;; TODO: Check why it is loaded multiple times
 
-  (m/via m/blk (let [client-opts (case @conf/profile
-                                   :test test-client-opts
-
-                                   :aws {:public-key (System/getenv "DYNAMODB_PUBLIC_KEY")
-                                         :secret-key (System/getenv "DYNAMODB_SECRET_KEY")
-                                         :endpoint   (System/getenv "DYNAMODB_ENDPOINT")
-                                         :region     (System/getenv "AWS_REGION")})
-
-                     table-name  (case @conf/profile
-                                   :test (str (:name (misc/project-info)) "-"
-                                              (System/getProperty "himmelsstuermer.test.database.id"
-                                                                  (str (random-uuid))))
-                                   :aws  (System/getenv "DYNAMODB_TABLE_NAME"))
-
-                     storage     (get-storage table-name client-opts)]
-                 (tt/event! ::init-db-storage {:data {:client-options client-opts
-                                                      :table-name table-name}})
+  (m/via m/blk (let [storage     (get-storage)]
+                 (tt/event! ::init-db-storage {:data {:storage storage}})
                  {:db/storage storage})))
 
 

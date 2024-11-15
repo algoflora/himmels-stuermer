@@ -343,6 +343,8 @@
                                (vector? %)            [:inline %])
                             ~arg)]
          (System/setProperty "himmelsstuermer.test.database.id" (str (random-uuid)))
+         (#'himmelsstuermer.core.storage/set-storage)
+         (#'himmelsstuermer.core.state/create-initial-state)
          (with-redefs [himmelsstuermer.core.dispatcher/main-handler
                        ~(if (some? h)
                           `(do

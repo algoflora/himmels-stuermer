@@ -16,13 +16,31 @@ public class ClojureLambdaHandler {
             IFn require = Clojure.var("clojure.core", "require");
             System.out.println("Require function obtained: " + require);
 
-            // Read the namespace symbol
-            Object namespaceSymbol = Clojure.read("himmelsstuermer.core");
-            System.out.println("Namespace symbol obtained: " + namespaceSymbol);
+            Object coreNamespaceSymbol = Clojure.read("himmelsstuermer.core");
+            System.out.println("Core namespace symbol obtained: " + coreNamespaceSymbol);
 
-            // Invoke 'require' on the namespace
-            require.invoke(namespaceSymbol);
-            System.out.println("Namespace required successfully");
+            require.invoke(coreNamespaceSymbol);
+            System.out.println("Core namespace required successfully");
+            
+            Object storageNamespaceSymbol = Clojure.read("himmelsstuermer.core.storage");
+            System.out.println("Storage namespace symbol obtained: " + storageNamespaceSymbol);
+
+            require.invoke(storageNamespaceSymbol);
+            System.out.println("Storage namespace required successfully");
+
+            IFn setStorage = Clojure.var("himmelsstuermer.core.storage", "set-storage");
+            setStorage.invoke();
+            System.out.println("Storage setup function invoked successfully");
+
+            Object stateNamespaceSymbol = Clojure.read("himmelsstuermer.core.state");
+            System.out.println("State namespace symbol obtained: " + stateNamespaceSymbol);
+
+            require.invoke(stateNamespaceSymbol);
+            System.out.println("State namespace required successfully");
+
+            IFn createState = Clojure.var("himmelsstuermer.core.state", "create-initial-state");
+            createState.invoke();
+            System.out.println("Initial state setup function invoked successfully");
         } catch (Exception e) {
             System.out.println("Exception during static initialization: " + e);
             e.printStackTrace();

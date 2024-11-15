@@ -10,33 +10,39 @@
     [taoensso.telemere :as tt]))
 
 
+(defonce ^:private !storage (atom nil))
+
+
 (defn get-storage
+  []
+  @!storage)
+
+
+(defn- create-storage
   [table-name {:keys [public-key secret-key endpoint region] :as opts}]
   (tt/event! ::get-storage {:data opts})
   (let [{client :result nanos :nanos}
         (misc/do-nanos* (api/make-client public-key secret-key endpoint region))
         _ (tt/event! ::client-received {:data {:client client
+                                               :time-millis (* 0.000001 nanos)}})
+
+        {tables :result nanos :nanos}
+        (misc/do-nanos* (api/list-tables client {:limit 100}))
+        _ (tt/event! ::tables-received {:data {:response tables
                                                :time-millis (* 0.000001 nanos)}})]
 
-    (when (= :test @profile)
-
-      (let [{tables :result nanos :nanos}
-            (misc/do-nanos* (api/list-tables client {:limit 100}))]
-        (tt/event! ::tables-received {:data {:response tables
-                                             :time-millis (* 0.000001 nanos)}}) ; TODO: Implement getting all tables
-
-        (when (nil? ((set (:TableNames tables)) table-name))
-          (let [{:keys [result nanos]}
-                (misc/do-nanos* (api/create-table client table-name
-                                                  {:Addr :N}
-                                                  {:Addr const/key-type-hash}
-                                                  {:tags {:project (:name (misc/project-info))
-                                                          :profile @profile}
-                                                   :table-class const/table-class-standard
-                                                   :billing-mode const/billing-mode-pay-per-request}))]
-            (tt/event! ::table-created {:data {:table-name table-name
-                                               :response result
-                                               :time-millis (* 0.000001 nanos)}})))))
+    (when (nil? ((set (:TableNames tables)) table-name))
+      (let [{:keys [result nanos]}
+            (misc/do-nanos* (api/create-table client table-name
+                                              {:Addr :N}
+                                              {:Addr const/key-type-hash}
+                                              {:tags {:project (:name (misc/project-info))
+                                                      :profile @profile}
+                                               :table-class const/table-class-standard
+                                               :billing-mode const/billing-mode-pay-per-request}))]
+        (tt/event! ::table-created {:data {:table-name table-name
+                                           :response result
+                                           :time-millis (* 0.000001 nanos)}})))
 
     (reify datascript.storage/IStorage
       (-store
@@ -113,11 +119,39 @@
                                        :time-millis (* 0.000001 nanos)}))))))
 
 
-(def test-client-opts
-  {:public-key "awsPublicKey"
-   :secret-key "awsSecretKey"
-   :endpoint   "http://localhost:8000"
-   :region     "aws-region"})
+(defn- get-client-opts
+  []
+  (case @profile
+    :test {:public-key "awsPublicKey"
+           :secret-key "awsSecretKey"
+           :endpoint   "http://localhost:8000"
+           :region     "aws-region"}
+
+    :aws {:public-key (System/getenv "DYNAMODB_PUBLIC_KEY")
+          :secret-key (System/getenv "DYNAMODB_SECRET_KEY")
+          :endpoint   (System/getenv "DYNAMODB_ENDPOINT")
+          :region     (System/getenv "AWS_REGION")}))
 
 
-(get nippy/public-types-spec -67)
+(defn- get-table-name
+  []
+  (case @profile
+    :test (str (:name (misc/project-info)) "-"
+               (System/getProperty "himmelsstuermer.test.database.id"
+                                   (str (random-uuid))))
+
+    :aws (System/getenv "DYNAMODB_TABLE_NAME")))
+
+
+(defn- set-storage
+  []
+  (let [table-name  (get-table-name)
+        client-opts (get-client-opts)
+        storage (create-storage table-name client-opts)]
+    (tt/event! ::set-storage {:data {:storage  storage
+                                     :client-opts client-opts
+                                     :table-name table-name}})
+    (reset! !storage storage)))
+
+
+;; (set-storage)

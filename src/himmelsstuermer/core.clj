@@ -182,12 +182,9 @@
    (m/sp (if fallback?
            (tt/event! ::executing-fallback {:data {:tasks tasks}})
            (tt/event! ::executing-business-logic {:data {:tasks tasks}}))
-         (try (let [tx-set                 (m/? (perform-tasks state tasks))
-                    {:keys [result nanos]} (m/? (persist-data state tx-set))
-                    tx-report              (sort-by #(nth % 0) (:tx-data result))]
-                (tt/event! ::execute-finished {:data {:tx-set tx-set
-                                                      :tx-report tx-report
-                                                      :persisted-millis (* 0.000001 nanos)}}))
+         (try (let [tx-set                 (m/? (perform-tasks state tasks))]
+                (m/? (persist-data state tx-set))
+                (tt/event! ::executing-finished))
               (catch Exception exc
                 (let [exc-map (throwable->map exc)]
                   (if fallback?
@@ -229,7 +226,7 @@
 
 (defn events
   [records ^Context context]
-  (m/sp (let [initial-state (m/? s/state)
+  (m/sp (let [initial-state (s/get-initial-state)
               aws-request-id (.getAwsRequestId ^Context context)]
           (tt/set-ctx! (assoc tt/*ctx* :aws-context {:aws-request-id aws-request-id}))
           {:state   (s/modify-state initial-state

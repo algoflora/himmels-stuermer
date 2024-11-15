@@ -23,10 +23,12 @@
 (defn deploy!
   [opts & args]
   (println "Deploy started...\nUser options:" opts)
+  ;; (System/setProperty "himmelsstuermer.profile" "aws")
   (let [nsec (do-nanos (let [opts (-> default-opts
                                       (assoc :args args)
                                       (merge (read-string opts))
                                       create-lambda-file)]
                          (write-config opts)
                          (apply! opts)))]
+    ;; (System/clearProperty "himmelsstuermer.profile")
     (printf "Deploy finished in %.2f seconds." (* nsec 0.000000001))))
