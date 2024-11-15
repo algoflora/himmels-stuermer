@@ -16,25 +16,27 @@
   (let [{client :result nanos :nanos}
         (misc/do-nanos* (api/make-client public-key secret-key endpoint region))
         _ (tt/event! ::client-received {:data {:client client
-                                               :time-millis (* 0.000001 nanos)}})
+                                               :time-millis (* 0.000001 nanos)}})]
 
-        {tables :result nanos :nanos}
-        (misc/do-nanos* (api/list-tables client {:limit 100}))
-        _ (tt/event! ::tables-received {:data {:response tables
-                                               :time-millis (* 0.000001 nanos)}})] ; TODO: Implement getting all tables
+    (when (= :test @profile)
 
-    (when (nil? ((set (:TableNames tables)) table-name))
-      (let [{:keys [result nanos]}
-            (misc/do-nanos* (api/create-table client table-name
-                                              {:Addr :N}
-                                              {:Addr const/key-type-hash}
-                                              {:tags {:project (:name (misc/project-info))
-                                                      :profile @profile}
-                                               :table-class const/table-class-standard
-                                               :billing-mode const/billing-mode-pay-per-request}))]
-        (tt/event! ::table-created {:data {:table-name table-name
-                                           :response result
-                                           :time-millis (* 0.000001 nanos)}})))
+      (let [{tables :result nanos :nanos}
+            (misc/do-nanos* (api/list-tables client {:limit 100}))]
+        (tt/event! ::tables-received {:data {:response tables
+                                             :time-millis (* 0.000001 nanos)}}) ; TODO: Implement getting all tables
+
+        (when (nil? ((set (:TableNames tables)) table-name))
+          (let [{:keys [result nanos]}
+                (misc/do-nanos* (api/create-table client table-name
+                                                  {:Addr :N}
+                                                  {:Addr const/key-type-hash}
+                                                  {:tags {:project (:name (misc/project-info))
+                                                          :profile @profile}
+                                                   :table-class const/table-class-standard
+                                                   :billing-mode const/billing-mode-pay-per-request}))]
+            (tt/event! ::table-created {:data {:table-name table-name
+                                               :response result
+                                               :time-millis (* 0.000001 nanos)}})))))
 
     (reify datascript.storage/IStorage
       (-store
