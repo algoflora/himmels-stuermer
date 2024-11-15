@@ -69,7 +69,7 @@
 (defn- walk
   [obj]
   (cond-> obj
-    ;; (instance? Throwable obj) throwable->map
+    (instance? Throwable obj) throwable->map
 
     (d/db? obj) ((constantly "<DATASCRIPT DB>"))
 
@@ -100,7 +100,7 @@
       (tt/call-on-shutdown! shutdown-hook)
       (tt/remove-handler! :default/console)
       (when (= :aws profile)
-        (tt/add-handler! :console-json (console-json-handler)))
+        (tt/add-handler! :console-json (console-json-handler) {:async false}))
       (when (= :test profile)
         (tt/add-handler! :console-event-id (console-event-id-handler))
         (tt/add-handler! :file-json-disposable (file-json-disposable-handler))
